@@ -10,9 +10,21 @@ public class Trader extends Agent<TradingModel.Globals> {
   @Variable
   public double tradingThresh;
 
+//  @Variable
+//  public double intrinsicValue;
+
+//  @Variable
+//  public double wealth;
+
+//  @Variable
+//  public double stock = 0;
+
+
   @Override
   public void init() {
     tradingThresh = getPrng().gaussian(0, 1).sample();
+//    wealth = getPrng().exponential(1000).sample();
+//    intrinsicValue = getPrng().normal(150, getGlobals().sigma).sample();
   }
 
   private static Action<Trader> action(SerializableConsumer<Trader> consumer) {
@@ -59,11 +71,13 @@ public class Trader extends Agent<TradingModel.Globals> {
     getLinks(Links.TradeLink.class).send(Messages.SellOrderPlaced.class);
   }
 
-//  public static Action<Trader> createNewLink = Action.create(Trader.class, a -> {
-//    a.getMessagesOfType(Messages.NewNeighborMessage.class).forEach(msg -> {
-//      a.addLink(targetID, Links.NeighborTrader.class);
+//  public static Action<Trader> createNewLink() {
+//    Action.create(Trader.class, a -> {
+//      a.getMessagesOfType(Messages.NewNeighborMessage.class).forEach(msg -> {
+//        a.addLink(targetID, Links.NeighborTrader.class);
+//      });
 //    });
-//  });
-
+//  }
+//}
 
 }

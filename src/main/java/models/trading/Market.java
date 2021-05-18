@@ -8,8 +8,13 @@ import simudyne.core.functions.SerializableConsumer;
 public class Market extends Agent<TradingModel.Globals> {
 
   @Variable
-  public double price = 8.0;
+  public double price;
   int numTraders;
+
+  @Override
+  public void init() {
+    price = getGlobals().marketPrice;
+  }
 
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);
@@ -28,9 +33,10 @@ public class Market extends Agent<TradingModel.Globals> {
           } else {
             double lambda = market.getGlobals().lambda;
             double priceChange = (netDemand / (double) market.numTraders) / lambda;
-            market.price += priceChange;
+            market.getGlobals().marketPrice += priceChange;
+            market.price = market.getGlobals().marketPrice; // for console
 
-            market.getDoubleAccumulator("price").add(market.price);
+            market.getDoubleAccumulator("price").add(market.getGlobals().marketPrice);
             market
                 .getLinks(Links.TradeLink.class)
                 .send(Messages.MarketPriceChange.class, priceChange);

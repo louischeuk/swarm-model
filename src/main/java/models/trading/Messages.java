@@ -8,6 +8,4 @@ public class Messages {
   public static class SellOrderPlaced extends Message.Empty {}
 
   public static class MarketPriceChange extends Message.Double {}
-
-  public static class NewNeighborMessage extends Message.Empty {}
 }

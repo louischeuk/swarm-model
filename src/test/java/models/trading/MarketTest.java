@@ -45,7 +45,7 @@ public class MarketTest {
     testKit.send(Messages.BuyOrderPlaced.class).to(market);
     testKit.send(Messages.SellOrderPlaced.class).to(market);
 
-    double startingPrice = market.price;
+    double startingPrice = market.getGlobals().marketPrice;
 
     TestResult testResult = testKit.testAction(market, Market.calcPriceImpact());
     Messages.MarketPriceChange expectedMessage =

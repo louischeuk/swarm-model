@@ -6,12 +6,13 @@ import simudyne.core.abm.Group;
 import simudyne.core.annotations.Constant;
 import simudyne.core.annotations.Input;
 import simudyne.core.annotations.ModelSettings;
+import simudyne.core.annotations.Variable;
 
 @ModelSettings(macroStep = 100)
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 100;
+  public int numTrader = 20;
 
   public static final class Globals extends GlobalState {
 
@@ -25,6 +26,12 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double volatilityInfo = 0.001;
 
     public double informationSignal;
+
+    @Input
+    public double sigma = 0.25; // for normal distribution
+
+    @Variable
+    public double marketPrice = 4.0;
   }
 
   @Override
@@ -33,8 +40,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createLongAccumulator("sells", "Number of sell orders");
     createDoubleAccumulator("price", "Market Price");
 
-    registerAgentTypes(Market.class, Trader.class, UtilityTradersGroup.class);
-    registerLinkTypes(Links.TradeLink.class, Links.UtilityTraders.class);
+    registerAgentTypes(Market.class, Trader.class);
+    registerLinkTypes(Links.TradeLink.class);
   }
 
   /**
@@ -52,9 +59,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     Group<Trader> traderGroup = generateGroup(Trader.class, numTrader);
     Group<Market> marketGroup = generateGroup(Market.class, 1,
         market -> market.numTraders = numTrader);
-
-    Group<UtilityTradersGroup> utilityTradersGroup = generateGroup(UtilityTradersGroup.class, 1);
-    traderGroup.fullyConnected(utilityTradersGroup, Links.UtilityTraders.class);
 
     traderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
     marketGroup.fullyConnected(traderGroup, Links.TradeLink.class);

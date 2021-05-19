@@ -1,5 +1,6 @@
 package models.trading;
 
+import models.trading.Messages.MarketPrice;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -32,8 +33,8 @@ public class MarketTest {
     testKit.send(Messages.SellOrderPlaced.class).to(market);
 
     TestResult testResult = testKit.testAction(market, Market.calcPriceImpact());
-    Messages.MarketPriceChange expectedMessage =
-        testResult.getMessagesOfType(Messages.MarketPriceChange.class).get(0);
+    MarketPrice expectedMessage =
+        testResult.getMessagesOfType(MarketPrice.class).get(0);
 
     assertEquals(0, expectedMessage.getBody(), 0);
   }
@@ -48,8 +49,8 @@ public class MarketTest {
     double startingPrice = market.getGlobals().marketPrice;
 
     TestResult testResult = testKit.testAction(market, Market.calcPriceImpact());
-    Messages.MarketPriceChange expectedMessage =
-        testResult.getMessagesOfType(Messages.MarketPriceChange.class).get(0);
+    MarketPrice expectedMessage =
+        testResult.getMessagesOfType(MarketPrice.class).get(0);
 
     double expectedPriceChange =
         (1 / (double) market.numTraders) / testKit.getGlobals().lambda;

@@ -1,9 +1,12 @@
 package models.trading;
 
+import java.util.List;
+import models.trading.Messages.MarketPrice;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
+import simudyne.core.graph.Message.Double;
 
 public class Market extends Agent<TradingModel.Globals> {
 
@@ -22,24 +25,41 @@ public class Market extends Agent<TradingModel.Globals> {
 
   public static Action<Market> calcPriceImpact() {
     return action(
-        market -> {
-          int buys = market.getMessagesOfType(Messages.BuyOrderPlaced.class).size();
-          int sells = market.getMessagesOfType(Messages.SellOrderPlaced.class).size();
+        m -> {
+          List<Messages.BuyOrderPlaced> buyMessages =
+              m.getMessagesOfType(Messages.BuyOrderPlaced.class);
+          List<Messages.SellOrderPlaced> sellMessages =
+              m.getMessagesOfType(Messages.SellOrderPlaced.class);
 
-          int netDemand = buys - sells;
+          // get total amount of buys and sells shares for all agents
+          double buys = buyMessages.stream().mapToDouble(Double::getBody).sum();
+          double sells = sellMessages.stream().mapToDouble(Double::getBody).sum();
+
+          System.out.println("Total buys stock: " + buys);
+          System.out.println("Total sell stock: " + sells);
+
+          double netDemand = buys - sells;
+
+          System.out.println("Net demand: " + netDemand);
 
           if (netDemand == 0) {
-            market.getLinks(Links.TradeLink.class).send(Messages.MarketPriceChange.class, 0);
-          } else {
-            double lambda = market.getGlobals().lambda;
-            double priceChange = (netDemand / (double) market.numTraders) / lambda;
-            market.getGlobals().marketPrice += priceChange;
-            market.price = market.getGlobals().marketPrice; // for console
+            m.getLinks(Links.TradeLink.class)
+                .send(MarketPrice.class, m.getGlobals().marketPrice);
+            m.getDoubleAccumulator("price").add(m.getGlobals().marketPrice);
 
-            market.getDoubleAccumulator("price").add(market.getGlobals().marketPrice);
-            market
+          } else {
+            double lambda = m.getGlobals().lambda;
+            double priceChange = netDemand * lambda; // what should lambda be?
+
+            System.out.println("Price change: " + priceChange);
+
+            m.getGlobals().marketPrice += priceChange;
+            m.price = m.getGlobals().marketPrice; // to see in console
+
+            m.getDoubleAccumulator("price").add(m.getGlobals().marketPrice);
+            m
                 .getLinks(Links.TradeLink.class)
-                .send(Messages.MarketPriceChange.class, priceChange);
+                .send(Messages.MarketPrice.class, m.getGlobals().marketPrice);
           }
         });
   }

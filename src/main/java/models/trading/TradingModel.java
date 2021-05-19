@@ -6,32 +6,31 @@ import simudyne.core.abm.Group;
 import simudyne.core.annotations.Constant;
 import simudyne.core.annotations.Input;
 import simudyne.core.annotations.ModelSettings;
-import simudyne.core.annotations.Variable;
 
 @ModelSettings(macroStep = 100)
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 20;
+  public int numTrader = 10;
 
   public static final class Globals extends GlobalState {
 
-    @Input(name = "Update Frequency")
-    public double updateFrequency = 0.01;
-
     @Input(name = "Lambda")
-    public double lambda = 10;
+    public double lambda = 0.1;
 
-    @Input(name = "Volatility of Information Signal")
-    public double volatilityInfo = 0.001;
+//    @Input(name = "Volatility of Information Signal")
+//    public double volatilityInfo = 0.001;
 
-    public double informationSignal;
+    @Input // volatility of market price - use in normal distribution
+    public double sigma = 0.25;
 
-    @Input
-    public double sigma = 0.25; // for normal distribution
+    public double marketPrice = 10.0;
 
-    @Variable
-    public double marketPrice = 4.0;
+    @Input // weight before buy or sell
+    public double weighting = 0.5;
+
+    public double shortSellExpireDay = 3;
+
   }
 
   @Override
@@ -41,24 +40,26 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createDoubleAccumulator("price", "Market Price");
 
     registerAgentTypes(Market.class, Trader.class);
-    registerLinkTypes(Links.TradeLink.class);
+    registerLinkTypes(Links.TradeLink.class, Links.TraderToTraderLink.class);
   }
 
   /**
    * Gaussian random walk the information signal, with variance of the volatility input.
    */
-  private void updateSignal() {
-    getGlobals().informationSignal =
-        getContext().getPrng().gaussian(0, getGlobals().volatilityInfo).sample();
-  }
+//  private void updateSignal() {
+//    getGlobals().informationSignal =
+//        getContext().getPrng().gaussian(0, getGlobals().volatilityInfo).sample();
+//  }
 
   @Override
   public void setup() {
-    updateSignal();
+//    updateSignal();
 
     Group<Trader> traderGroup = generateGroup(Trader.class, numTrader);
     Group<Market> marketGroup = generateGroup(Market.class, 1,
         market -> market.numTraders = numTrader);
+
+    traderGroup.fullyConnected(traderGroup, Links.TraderToTraderLink.class);
 
     traderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
     marketGroup.fullyConnected(traderGroup, Links.TradeLink.class);
@@ -70,8 +71,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void step() {
     super.step();
 
-    updateSignal();
+//    updateSignal();
 
-    run(Trader.processInformation(), Market.calcPriceImpact(), Trader.updateThreshold());
+    run(Trader.processMarketPrice(), Market.calcPriceImpact(), Trader.adjustIntrinsicValue());
   }
 }

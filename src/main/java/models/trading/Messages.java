@@ -9,4 +9,5 @@ public class Messages {
 
   public static class MarketPrice extends Message.Double {}
 
+  public static class ShortSellOrderPlaced extends Message.Double {}
 }

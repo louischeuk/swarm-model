@@ -11,36 +11,46 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 10;
+  public int numTrader = 100;
 
   public static final class Globals extends GlobalState {
 
     @Input(name = "Lambda")
     public double lambda = 0.1;
 
-//    @Input(name = "Volatility of Information Signal")
-//    public double volatilityInfo = 0.001;
-
     @Input // volatility of market price - use in normal distribution
     public double sigma = 0.25;
 
+    @Input(name = "Market Price")
     public double marketPrice = 10.0;
 
     @Input // weight before buy or sell
     public double weighting = 0.5;
 
-    public double shortSellExpireDay = 3;
+    @Input(name = "Short Selling duration")
+    public int shortSellDuration = 5;
+
+    @Input(name = "sensitivity")
+    public double sensitivity = 0.15;
+
+    @Input(name = "Initial Margin Requirement")
+    public double initialMarginRequirement = 0.5;
+
+    @Input(name = "Maintenance Margin")
+    public double maintenanceMargin = 0.3;
 
   }
 
   @Override
   public void init() {
+
     createLongAccumulator("buys", "Number of buy orders");
-    createLongAccumulator("sells", "Number of sell orders");
-    createDoubleAccumulator("price", "Market Price");
+    createLongAccumulator("sells", "Number of sell orders"); // exclusive
+    createLongAccumulator("shorts", "Number of short sell orders"); // exclusive
+    createDoubleAccumulator("price", "Market price");
 
     registerAgentTypes(Market.class, Trader.class);
-    registerLinkTypes(Links.TradeLink.class, Links.TraderToTraderLink.class);
+    registerLinkTypes(Links.TradeLink.class);
   }
 
   /**
@@ -53,13 +63,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Override
   public void setup() {
-//    updateSignal();
-
     Group<Trader> traderGroup = generateGroup(Trader.class, numTrader);
     Group<Market> marketGroup = generateGroup(Market.class, 1,
         market -> market.numTraders = numTrader);
 
-    traderGroup.fullyConnected(traderGroup, Links.TraderToTraderLink.class);
+//    traderGroup.fullyConnected(traderGroup, Links.TraderToTraderLink.class);
 
     traderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
     marketGroup.fullyConnected(traderGroup, Links.TradeLink.class);
@@ -71,8 +79,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void step() {
     super.step();
 
-//    updateSignal();
-
-    run(Trader.processMarketPrice(), Market.calcPriceImpact(), Trader.adjustIntrinsicValue());
+    run(Trader.processMarketPrice(),
+        Market.calcPriceImpact(),
+        Trader.adjustIntrinsicValue());
   }
 }

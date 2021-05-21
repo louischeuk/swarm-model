@@ -1,5 +1,6 @@
 package models.trading;
 
+import com.google.errorprone.annotations.Var;
 import java.util.List;
 import models.trading.Messages.MarketPrice;
 import simudyne.core.abm.Action;
@@ -15,9 +16,7 @@ public class Market extends Agent<TradingModel.Globals> {
   int numTraders;
 
   @Override
-  public void init() {
-    price = getGlobals().marketPrice;
-  }
+  public void init() { price = getGlobals().marketPrice; }
 
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);
@@ -30,13 +29,17 @@ public class Market extends Agent<TradingModel.Globals> {
               m.getMessagesOfType(Messages.BuyOrderPlaced.class);
           List<Messages.SellOrderPlaced> sellMessages =
               m.getMessagesOfType(Messages.SellOrderPlaced.class);
+          List<Messages.ShortSellOrderPlaced> shortSellMessages =
+              m.getMessagesOfType(Messages.ShortSellOrderPlaced.class);
 
           // get total amount of buys and sells shares for all agents
           double buys = buyMessages.stream().mapToDouble(Double::getBody).sum();
           double sells = sellMessages.stream().mapToDouble(Double::getBody).sum();
+          double shorts = shortSellMessages.stream().mapToDouble(Double::getBody).sum();
 
-          System.out.println("Total buys stock: " + buys);
-          System.out.println("Total sell stock: " + sells);
+          System.out.println("Total buys shares: " + buys
+              + " | Total sell shares: " + sells
+              + " | Total short sell shares: " + shorts);
 
           double netDemand = buys - sells;
 
@@ -44,7 +47,8 @@ public class Market extends Agent<TradingModel.Globals> {
 
           if (netDemand == 0) {
             m.getLinks(Links.TradeLink.class)
-                .send(MarketPrice.class, m.getGlobals().marketPrice);
+                .send(Messages.MarketPrice.class, m.getGlobals().marketPrice);
+
             m.getDoubleAccumulator("price").add(m.getGlobals().marketPrice);
 
           } else {
@@ -52,13 +56,13 @@ public class Market extends Agent<TradingModel.Globals> {
             double priceChange = netDemand * lambda; // what should lambda be?
 
             System.out.println("Price change: " + priceChange);
+            System.out.println();
 
             m.getGlobals().marketPrice += priceChange;
             m.price = m.getGlobals().marketPrice; // to see in console
 
             m.getDoubleAccumulator("price").add(m.getGlobals().marketPrice);
-            m
-                .getLinks(Links.TradeLink.class)
+            m.getLinks(Links.TradeLink.class)
                 .send(Messages.MarketPrice.class, m.getGlobals().marketPrice);
           }
         });

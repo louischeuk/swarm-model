@@ -1,8 +1,6 @@
 package models.trading;
 
-import com.google.errorprone.annotations.Var;
 import java.util.List;
-import models.trading.Messages.MarketPrice;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -16,7 +14,9 @@ public class Market extends Agent<TradingModel.Globals> {
   int numTraders;
 
   @Override
-  public void init() { price = getGlobals().marketPrice; }
+  public void init() {
+    price = getGlobals().marketPrice;
+  }
 
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);
@@ -31,17 +31,27 @@ public class Market extends Agent<TradingModel.Globals> {
               m.getMessagesOfType(Messages.SellOrderPlaced.class);
           List<Messages.ShortSellOrderPlaced> shortSellMessages =
               m.getMessagesOfType(Messages.ShortSellOrderPlaced.class);
+          List<Messages.CoverShortPosOrderPlaced> coverShortPosMessages =
+              m.getMessagesOfType(Messages.CoverShortPosOrderPlaced.class);
 
           // get total amount of buys and sells shares for all agents
           double buys = buyMessages.stream().mapToDouble(Double::getBody).sum();
           double sells = sellMessages.stream().mapToDouble(Double::getBody).sum();
           double shorts = shortSellMessages.stream().mapToDouble(Double::getBody).sum();
+          double covers = coverShortPosMessages.stream().mapToDouble(Double::getBody).sum();
 
-          System.out.println("Total buys shares: " + buys
-              + " | Total sell shares: " + sells
-              + " | Total short sell shares: " + shorts);
+          System.out.println(
+              "Total buys shares: " + buys + " (with cover short Pos: " + covers + ")");
+          System.out.println(
+              "Total sell shares: " + sells + " (with short-sell shares: " + shorts + ")");
+
+          System.out.println("Total volume: " + (buys + sells));
+
 
           double netDemand = buys - sells;
+
+          // binomial model : p (% of rise), q (% of drop)
+          // overturn volume
 
           System.out.println("Net demand: " + netDemand);
 

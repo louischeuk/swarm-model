@@ -19,7 +19,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double lambda = 0.1;
 
     @Input // volatility of market price - use in normal distribution
-    public double sigma = 0.25;
+    public double sigma = 0.35;
 
     @Input(name = "Market Price")
     public double marketPrice = 10.0;
@@ -28,7 +28,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double weighting = 0.5;
 
     @Input(name = "Short Selling duration")
-    public int shortSellDuration = 5;
+    public int shortSellDuration = 4;
 
     @Input(name = "sensitivity")
     public double sensitivity = 0.15;
@@ -45,8 +45,9 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void init() {
 
     createLongAccumulator("buys", "Number of buy orders");
-    createLongAccumulator("sells", "Number of sell orders"); // exclusive
-    createLongAccumulator("shorts", "Number of short sell orders"); // exclusive
+    createLongAccumulator("sells", "Number of sell orders");
+    createLongAccumulator("shorts", "Number of short sell orders"); // inclusive
+    createLongAccumulator("coverShorts", "Number of short position covered"); // inclusive
     createDoubleAccumulator("price", "Market price");
 
     registerAgentTypes(Market.class, Trader.class);

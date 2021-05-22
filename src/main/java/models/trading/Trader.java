@@ -7,6 +7,10 @@ import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
+// momentum trader : people buy you buy
+// principal trader :
+// technical trader :
+
 public class Trader extends Agent<TradingModel.Globals> {
 
   @Variable
@@ -19,24 +23,25 @@ public class Trader extends Agent<TradingModel.Globals> {
   public double shares = 0;
 
   @Variable
-  public int timeSinceShortSell = -1;
+  public int timeSinceShort = -1;
 
   @Variable
-  public int selfShortSellDuration;
-
-  @Variable
-  public boolean isBroke = false;
+  public int shortDuration;
 
   @Variable
   public double marginAccount = 0;
+
+  public boolean isBroke = false;
+
+  @Variable
+  public int numOfShortingSellInProcess = 0;
 
 
   @Override
   public void init() {
     intrinsicValue = getPrng().normal(getGlobals().marketPrice, getGlobals().sigma).sample();
     wealth = getPrng().exponential(100).sample();
-    selfShortSellDuration = getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
-
+    shortDuration = getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
   }
 
   private static Action<Trader> action(SerializableConsumer<Trader> consumer) {
@@ -61,30 +66,34 @@ public class Trader extends Agent<TradingModel.Globals> {
 
             if (priceDistortion > 0) {
 
-              int sharesToBuy = (int) Math.ceil(priceDistortion * t.getGlobals().sensitivity
-                  * t.getGlobals().weighting); // weight before buy / sell
-              System.out.println("Amount shares to buy: " + sharesToBuy);
+              int buyVolume =
+                  (int) Math.ceil(priceDistortion
+                      * t.getGlobals().sensitivity
+                      * t.getGlobals().weighting); // weight before buy / sell
 
-              t.handleWhenBuyShares(price, sharesToBuy);
+              System.out.println("Amount shares to buy: " + buyVolume);
+
+              t.handleWhenBuyShares(price, buyVolume);
 
             } else if (priceDistortion < 0) { // sell or short-sell
 
-              int sharesToSell = (int) Math.ceil
-                  (Math.abs(priceDistortion) * t.getGlobals().sensitivity
+              int sellVolume =
+                  (int) Math.ceil(Math.abs(priceDistortion)
+                      * t.getGlobals().sensitivity
                       * t.getGlobals().weighting);
-              System.out.println("Amount shares to sell: " + sharesToSell);
 
-              t.handleWhenSellShares(sharesToSell);
+              System.out.println("Amount shares to sell: " + sellVolume);
+
+              t.handleWhenSellShares(sellVolume);
             }
 
-            if (t.timeSinceShortSell > -1) { // short selling
+            if (t.timeSinceShort > -1) { // short selling
               t.handleDuringShortSelling();
             }
           }
         }
     );
   }
-
 
   // random walk - brownian motion - keep estimate
   public static Action<Trader> adjustIntrinsicValue() {
@@ -93,9 +102,15 @@ public class Trader extends Agent<TradingModel.Globals> {
           double price = t.getMessageOfType(MarketPrice.class).getBody();
 
 //          System.out.println("Previous intrinsic: " + t.intrinsicValue);
+
           double p = t.getPrng().uniform(0, 1).sample();
 
-          t.intrinsicValue = t.getPrng().normal(price, p).sample();
+          t.intrinsicValue = p >= 0.55
+              ? t.getPrng().normal(price, p).sample() * 0.99
+              : t.getPrng().normal(price, 1-p).sample() * 0.99;
+
+//          t.intrinsicValue = t.getPrng().normal(price, p).sample();
+
 //          System.out.println("New intrinsic value: " + t.intrinsicValue);
         });
   }
@@ -104,8 +119,9 @@ public class Trader extends Agent<TradingModel.Globals> {
     if (hasEnoughWealth(price * sharesToBuy)) {
       buy(sharesToBuy);
 
-      if (shares >= 0 && timeSinceShortSell > -1) {
+      if (shares >= 0 && timeSinceShort > -1) {
         // cover all the shorts position
+
         resetMarginAccount();
       }
     }
@@ -114,12 +130,13 @@ public class Trader extends Agent<TradingModel.Globals> {
   private void handleWhenSellShares(int sharesToSell) {
     if (hasEnoughShares(sharesToSell)) {
       sell(sharesToSell);
-    } else if (shares >= 0) {
-      handleNotEnoughSharesToSell(sharesToSell);
     } else {
-      // cannot short more there is short position
-      System.out.println("Short selling, waiting until short positions are covered");
+      handleNotEnoughSharesToSell(sharesToSell);
     }
+//    else {
+    // cannot short more there is short position
+//      System.out.println("Short selling, waiting until short positions are covered");
+//    }
   }
 
   private void handleNotEnoughSharesToSell(double sharesToSell) {
@@ -135,20 +152,52 @@ public class Trader extends Agent<TradingModel.Globals> {
     }
   }
 
+  private void initiateMarginAccount(double sharesToShort) {
+    marginAccount =
+        (sharesToShort * getGlobals().marketPrice) * (1 + getGlobals().initialMarginRequirement);
+
+    System.out.println("Margin account: " + marginAccount);
+  }
+
+  private boolean isShortSellAllowed(double sharesToSell) {
+    if (numOfShortingSellInProcess >= 3) {
+      System.out.println("Already shorted " + numOfShortingSellInProcess + " times, wait!");
+      return false;
+    }
+    return isWealthMeetInitialMarginRequirement(sharesToSell);
+  }
+
+  private boolean isWealthMeetInitialMarginRequirement(double sharesToSell) {
+    // example: with 10K investment, you need 5K cash at start
+    if (shares == 0) {
+      return wealth
+          >= (sharesToSell * getGlobals().marketPrice * getGlobals().initialMarginRequirement);
+    }
+
+    // share < 0: (there are already some short positions)
+
+    System.out.println("Hello shares here is " + shares);
+    return wealth >= (
+        (Math.abs(shares) + sharesToSell) * getGlobals().marketPrice
+            * getGlobals().initialMarginRequirement);
+
+  }
+
   private void handleDuringShortSelling() {
     if (isMarginCallTriggered()) {
       forceLiquidateShortPosition();
       System.out.println("Oh shit forced to liquidate!");
     }
 
-    if (timeSinceShortSell++ > selfShortSellDuration) {
+    if (timeSinceShort++ > shortDuration) {
       coverShortPosition(Math.abs(shares));
     }
   }
 
   private void resetMarginAccount() {
     marginAccount = 0;
-    timeSinceShortSell = -1;
+    timeSinceShort = -1;
+    numOfShortingSellInProcess = 0;
   }
 
   private void forceLiquidateShortPosition() {
@@ -156,8 +205,11 @@ public class Trader extends Agent<TradingModel.Globals> {
   }
 
   private void coverShortPosition(double sharesToCover) {
+
     buy(sharesToCover);
     resetMarginAccount();
+
+    System.out.println("Shorts Position covered lolll");
 
     if (wealth < 0) {
       System.out.println("wealth drops below -ve: you broke!");
@@ -166,6 +218,14 @@ public class Trader extends Agent<TradingModel.Globals> {
   }
 
   private void buy(double amountToBuy) {
+
+    if (shares < 0) {
+      getLongAccumulator("coverShorts").add((long) amountToBuy);
+      getLinks(Links.TradeLink.class).send(Messages.CoverShortPosOrderPlaced.class, amountToBuy);
+
+      System.out.println("heloooooooo");
+    }
+
     getLongAccumulator("buys").add((long) amountToBuy);
     getLinks(Links.TradeLink.class).send(Messages.BuyOrderPlaced.class, amountToBuy);
 
@@ -189,8 +249,11 @@ public class Trader extends Agent<TradingModel.Globals> {
 
 
   private void shortSell(double sharesToShort) {
-
-    initiateMarginAccount(sharesToShort);
+    if (shares < 0) {
+      updateMarginAccount(sharesToShort); // update margin account with more shorts
+    } else {
+      initiateMarginAccount(sharesToShort);
+    }
 
     getLongAccumulator("shorts").add((long) sharesToShort);
     getLinks(Links.TradeLink.class).send(Messages.ShortSellOrderPlaced.class, sharesToShort);
@@ -199,9 +262,17 @@ public class Trader extends Agent<TradingModel.Globals> {
 
     sell(sharesToShort);
 
-    if (timeSinceShortSell == -1) {
-      timeSinceShortSell = 0;
-    }
+    timeSinceShort = 0;
+    numOfShortingSellInProcess++;
+    System.out.println("Num of short sell in process: " + numOfShortingSellInProcess);
+  }
+
+  private void updateMarginAccount(double sharesToShort) {
+    marginAccount =
+        (Math.abs(shares) * getGlobals().marketPrice + sharesToShort * getGlobals().marketPrice)
+            * (1 + getGlobals().initialMarginRequirement);
+
+    System.out.println("~~~~~~Margin account updated: " + marginAccount);
   }
 
   private void sell(double sharesToSell) {
@@ -216,23 +287,6 @@ public class Trader extends Agent<TradingModel.Globals> {
 
 //    System.out.println("Current wealth: " + wealth);
 //    System.out.println("Current shares: " + shares);
-  }
-
-  private void initiateMarginAccount(double sharesToShort) {
-    marginAccount =
-        (sharesToShort * getGlobals().marketPrice) * (1 + getGlobals().initialMarginRequirement);
-
-    System.out.println("Margin account: " + marginAccount);
-  }
-
-  private boolean isShortSellAllowed(double sharesToSell) {
-    return isWealthMeetInitialMarginRequirement(sharesToSell);
-  }
-
-  private boolean isWealthMeetInitialMarginRequirement(double sharesToSell) {
-    return wealth
-        >= (sharesToSell * getGlobals().marketPrice * getGlobals().initialMarginRequirement);
-    // example: with 10K investment, you need 5K cash at start
   }
 
   private boolean hasEnoughShares(int amountToSell) {

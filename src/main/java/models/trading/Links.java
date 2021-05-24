@@ -7,5 +7,5 @@ public class Links {
 
   public static class CoordinatedLink extends Link.Empty {}
 
-//  public static class TraderToTraderLink extends Link.Empty {}
+  public static class ToEveryTraderLink extends Link.Empty {}
 }

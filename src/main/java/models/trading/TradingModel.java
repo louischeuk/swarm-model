@@ -1,5 +1,6 @@
 package models.trading;
 
+import models.trading.Links.ToEveryTraderLink;
 import models.trading.Trader.Type;
 import simudyne.core.abm.AgentBasedModel;
 import simudyne.core.abm.GlobalState;
@@ -12,27 +13,30 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 100;
+  public int numTrader = 20;
 
   public static final class Globals extends GlobalState {
 
     // for the net demand of traded stock
-    @Input(name = "Lambda")
-    public double lambda = 0.1;
+    @Input(name = "Exchange's Lambda / Price Elasticity")
+    public double lambda = 0.15;
 
-    // volatility of market price - use in normal distribution
-    @Input(name = "Sigma, market price volatility")
-    public double sigma = 0.35;
+//    // volatility of market price - use in normal distribution
+//    @Input(name = "Sigma, market price volatility")
+//    public double sigma = 0.35;
 
     @Input(name = "Market Price")
-    public double marketPrice = 10.0;
+    public double marketPrice = 50.0;
+
+    @Input(name = "standard deviation") // for normal distribution
+    public double stdDev = 10;
 
     // weight before buy or sell
     @Input(name = "Weighting")
     public double weighting = 0.5;
 
     @Input(name = "Short Selling duration")
-    public int shortSellDuration = 3;
+    public int shortSellDuration = 5;
 
     @Input(name = "sensitivity")
     public double sensitivity = 0.15;
@@ -42,6 +46,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     @Input(name = "Maintenance Margin")
     public double maintenanceMargin = 0.3;
+
+    public boolean isMarketShockTriggered = false;
 
   }
 
@@ -55,16 +61,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createDoubleAccumulator("price", "Market price");
 
     registerAgentTypes(Market.class, Trader.class);
-    registerLinkTypes(Links.TradeLink.class, Links.CoordinatedLink.class);
+    registerLinkTypes(Links.TradeLink.class,
+        Links.CoordinatedLink.class,
+        Links.ToEveryTraderLink.class);
   }
 
-  /**
-   * Gaussian random walk the information signal, with variance of the volatility input.
-   */
-//  private void updateSignal() {
-//    getGlobals().informationSignal =
-//        getContext().getPrng().gaussian(0, getGlobals().volatilityInfo).sample();
-//  }
   @Override
   public void setup() {
     Group<Trader> traderGroup = generateGroup(Trader.class, numTrader, t -> {
@@ -73,7 +74,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
       if (t.getID() < numTrader * 0.2) {
         t.type = Type.Coordinated;
         for (int i = 0; i < numTrader * 0.2; i++) { // group the WSB traders
-            t.addLink(i, Links.CoordinatedLink.class);
+          t.addLink(i, Links.CoordinatedLink.class);
         }
 
       } else if (t.getID() >= numTrader * 0.2 && t.getID() < numTrader * 0.7) {
@@ -92,7 +93,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     Group<Market> marketGroup = generateGroup(Market.class, 1,
         market -> market.numTraders = numTrader);
 
-//    traderGroup.fullyConnected(traderGroup, Links.TraderToTraderLink.class);
+    traderGroup.fullyConnected(traderGroup, ToEveryTraderLink.class);
 
     traderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
     marketGroup.fullyConnected(traderGroup, Links.TradeLink.class);

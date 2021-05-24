@@ -11,7 +11,12 @@ public class Market extends Agent<TradingModel.Globals> {
 
   @Variable
   public double price;
+
   int numTraders;
+
+  int timeStep = 0;
+
+  int marketShockStep = 10;
 
   @Override
   public void init() {
@@ -44,15 +49,9 @@ public class Market extends Agent<TradingModel.Globals> {
               "Total buys shares: " + buys + " (with cover short Pos: " + covers + ")");
           System.out.println(
               "Total sell shares: " + sells + " (with short-sell shares: " + shorts + ")");
-
           System.out.println("Total volume: " + (buys + sells));
 
-
           double netDemand = buys - sells;
-
-          // binomial model : p (% of rise), q (% of drop)
-          // overturn volume
-
           System.out.println("Net demand: " + netDemand);
 
           if (netDemand == 0) {
@@ -75,6 +74,16 @@ public class Market extends Agent<TradingModel.Globals> {
             m.getLinks(Links.TradeLink.class)
                 .send(Messages.MarketPrice.class, m.getGlobals().marketPrice);
           }
+
+          // if marketShock is triggered
+          if (++m.timeStep == m.marketShockStep) {
+            m.getGlobals().isMarketShockTriggered = true;
+            m.getLinks(Links.TradeLink.class)
+                .send(Messages.MarketShock.class, m.timeStep);
+          }
+
+          System.out.println("Time step: " + m.timeStep);
+
         });
   }
 }

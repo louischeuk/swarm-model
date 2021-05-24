@@ -140,9 +140,9 @@ public class Trader extends Agent<TradingModel.Globals> {
           double p = t.getPrng().uniform(0, 1).sample();
           double p2 = t.getPrng().uniform(0.00, 0.05).sample();
 
-          t.intrinsicValue = p >= 0.65
-              ? t.intrinsicValue + t.getPrng().normal(price * p2, t.getGlobals().stdDev).sample()
-              : t.intrinsicValue - t.getPrng().normal(price * p2, t.getGlobals().stdDev).sample();
+          t.intrinsicValue = p >= 0.6
+              ? t.intrinsicValue + t.getPrng().normal(t.intrinsicValue * p2, t.getGlobals().stdDev).sample()
+              : t.intrinsicValue - t.getPrng().normal(t.intrinsicValue * p2, t.getGlobals().stdDev).sample();
 
           t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 

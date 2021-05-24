@@ -27,7 +27,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     // for the net demand of traded stock
     @Input(name = "Exchange's Lambda / Price Elasticity")
-    public double lambda = 0.1;
+    public double lambda = 0.05;
 
     @Input(name = "standard deviation") // for normal distribution
     public double stdDev = 10;

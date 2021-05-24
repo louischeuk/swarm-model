@@ -47,7 +47,7 @@ public class Trader extends Agent<TradingModel.Globals> {
   public boolean isBroke = false;
 
   @Variable // the total times of transaction of short selling at a moment cannot exceed a int
-  public int numShortingInProcess = 0;
+  public int numShortingInProcess = 3;
 
   public double opinion; // a real-number between [-1, 1]
 
@@ -55,7 +55,7 @@ public class Trader extends Agent<TradingModel.Globals> {
   @Override
   public void init() {
     intrinsicValue = getPrng().normal(getGlobals().marketPrice, getGlobals().stdDev).sample();
-    wealth = getPrng().exponential(500).sample();
+    wealth = getPrng().exponential(1000).sample();
     shortDuration = getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
     opinion = getPrng().uniform(-1, 1).sample();
   }
@@ -81,14 +81,14 @@ public class Trader extends Agent<TradingModel.Globals> {
             System.out.println("Intrinsic: " + t.intrinsicValue);
             System.out.println("market price: " + price);
 
-            if (Math.abs(priceDistortion) < t.intrinsicValue * 0.008) {
+            if (Math.abs(priceDistortion) < t.intrinsicValue * 0.01) {
               System.out.println("Trader holds");
 
             } else if (priceDistortion > 0) {
 
               int buyVolume =
                   (int) Math.ceil(
-                      t.getPrng().normal(priceDistortion, 0.15).sample()
+                      t.getPrng().normal(priceDistortion, 0.2).sample()
 //                      priceDistortion
                           * t.getGlobals().sensitivity
                           * t.getGlobals().weighting); // weight before buy / sell
@@ -101,7 +101,7 @@ public class Trader extends Agent<TradingModel.Globals> {
 
               int sellVolume =
                   (int) Math.ceil(Math.abs(
-                      t.getPrng().normal(priceDistortion, 0.15).sample())
+                      t.getPrng().normal(priceDistortion, 0.2).sample())
 //                      priceDistortion)
                       * t.getGlobals().sensitivity
                       * t.getGlobals().weighting);
@@ -128,19 +128,12 @@ public class Trader extends Agent<TradingModel.Globals> {
     return action(
         t -> {
 
-          //          t.updateOpinion();
+          // t.updateOpinion();
 
-//          if (!t.getMessagesOfType(Messages.MarketShock.class).isEmpty()) {
-//            System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
-//            t.reactMarketShock();
-//          }
-//
-//          if (t.getGlobals().isMarketShockTriggered) {
-//            double p = t.getPrng().uniform(0, 1).sample();
-//            t.intrinsicValue = p >= 0.5
-//                ? t.getPrng().normal(t.intrinsicValue, p).sample() * 0.996
-//                : t.getPrng().normal(t.intrinsicValue, 1 - p).sample() * 0.996;
-//          } else {
+          if (!t.getMessagesOfType(Messages.MarketShock.class).isEmpty()) {
+            System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
+            t.reactMarketShock();
+          }
 
           double price = t.getMessageOfType(MarketPrice.class).getBody();
 
@@ -148,8 +141,8 @@ public class Trader extends Agent<TradingModel.Globals> {
           double p2 = t.getPrng().uniform(0.00, 0.05).sample();
 
           t.intrinsicValue = p >= 0.65
-              ? t.intrinsicValue + t.getPrng().normal(t.intrinsicValue * p2, t.getGlobals().stdDev).sample()
-              : t.intrinsicValue - t.getPrng().normal(t.intrinsicValue * p2, t.getGlobals().stdDev).sample();
+              ? t.intrinsicValue + t.getPrng().normal(price * p2, t.getGlobals().stdDev).sample()
+              : t.intrinsicValue - t.getPrng().normal(price * p2, t.getGlobals().stdDev).sample();
 
           t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
@@ -191,9 +184,14 @@ public class Trader extends Agent<TradingModel.Globals> {
     if (hasEnoughWealth(price * sharesToBuy)) {
       buy(sharesToBuy);
 
-      if (shares >= 0 && timeSinceShort > -1) {
-        resetMarginAccount(); // cover all the shorts position
+      if (shares < 0) {
+        updateMarginAccount(Math.abs(shares) - sharesToBuy);
+      } else {
+        if (shares >= 0 && timeSinceShort > -1) {
+          resetMarginAccount(); // cover all the shorts position
+        }
       }
+
     }
   }
 
@@ -226,7 +224,7 @@ public class Trader extends Agent<TradingModel.Globals> {
   }
 
   private boolean isShortSellAllowed(double sharesToSell) {
-    if (numShortingInProcess >= 3) {
+    if (numShortingInProcess >= getGlobals().maxShortingInProcess) {
       System.out.println("Already shorted " + numShortingInProcess + " times, wait!");
       return false;
     }
@@ -313,7 +311,8 @@ public class Trader extends Agent<TradingModel.Globals> {
 
   private void shortSell(double sharesToShort) {
     if (shares < 0) {
-      updateMarginAccount(sharesToShort); // update margin account with more shorts
+      updateMarginAccount(
+          Math.abs(shares) + sharesToShort); // update margin account with more shorts
     } else {
       initiateMarginAccount(sharesToShort);
     }
@@ -325,15 +324,17 @@ public class Trader extends Agent<TradingModel.Globals> {
 
     sell(sharesToShort);
 
-    timeSinceShort = 0;
+    if (timeSinceShort == -1) {
+      timeSinceShort = 0;
+    }
+
     numShortingInProcess++;
     System.out.println("Num of short sell in process: " + numShortingInProcess);
   }
 
   private void updateMarginAccount(double sharesToShort) {
     marginAccount =
-        (Math.abs(shares) * getGlobals().marketPrice + sharesToShort * getGlobals().marketPrice)
-            * (1 + getGlobals().initialMarginRequirement);
+        sharesToShort * getGlobals().marketPrice * (1 + getGlobals().initialMarginRequirement);
 
     System.out.println("~~~~~~Margin account updated: " + marginAccount);
   }

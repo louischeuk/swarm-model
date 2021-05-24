@@ -17,29 +17,33 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   public static final class Globals extends GlobalState {
 
-    // for the net demand of traded stock
-    @Input(name = "Exchange's Lambda / Price Elasticity")
-    public double lambda = 0.15;
-
-//    // volatility of market price - use in normal distribution
+    //    // volatility of market price - use in normal distribution
 //    @Input(name = "Sigma, market price volatility")
 //    public double sigma = 0.35;
 
+
     @Input(name = "Market Price")
     public double marketPrice = 50.0;
+
+    // for the net demand of traded stock
+    @Input(name = "Exchange's Lambda / Price Elasticity")
+    public double lambda = 0.1;
 
     @Input(name = "standard deviation") // for normal distribution
     public double stdDev = 10;
 
     // weight before buy or sell
     @Input(name = "Weighting")
-    public double weighting = 0.5;
+    public double weighting = 0.3;
 
     @Input(name = "Short Selling duration")
-    public int shortSellDuration = 5;
+    public int shortSellDuration = 100;
+
+    @Input(name = "max times of short sell in process")
+    public int maxShortingInProcess = 6;
 
     @Input(name = "sensitivity")
-    public double sensitivity = 0.15;
+    public double sensitivity = 0.25;
 
     @Input(name = "Initial Margin Requirement")
     public double initialMarginRequirement = 0.5;

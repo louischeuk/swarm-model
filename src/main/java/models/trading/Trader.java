@@ -1,17 +1,28 @@
 package models.trading;
 
 import models.trading.Messages.MarketPrice;
-import scala.concurrent.java8.FuturesConvertersImpl.P;
+import org.apache.commons.math3.exception.MathIllegalStateException;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
-// momentum trader : people buy you buy
-// principal trader :
-// technical trader :
-
 public class Trader extends Agent<TradingModel.Globals> {
+
+  public enum Type {Momentum, ZI, MI, Opinionated, Coordinated}
+
+  ;
+   /*
+   Trader type:
+   momentum: buy securities that are rising and sell them when they look to have peaked
+   zero-intelligence trader: force to buy and sell at prices bounded by the intrinsic value
+   minimal-intelligence trader: adapt to the environment is seen by some as a minimal intelligence
+   opinionated: has the knowledge of Limit Order Book.
+                        submits quote prices that vary according to its opinion
+   coordinated: Reddit WSB
+   */
+
+  public Type type;
 
   @Variable
   public double intrinsicValue;
@@ -25,7 +36,7 @@ public class Trader extends Agent<TradingModel.Globals> {
   @Variable
   public int timeSinceShort = -1;
 
-  @Variable
+  @Variable // after this shortDuration, you must cover your short positions
   public int shortDuration;
 
   @Variable
@@ -33,7 +44,7 @@ public class Trader extends Agent<TradingModel.Globals> {
 
   public boolean isBroke = false;
 
-  @Variable
+  @Variable // the total times of transaction of short selling at a moment cannot exceed a int
   public int numOfShortingSellInProcess = 0;
 
 
@@ -64,12 +75,17 @@ public class Trader extends Agent<TradingModel.Globals> {
             System.out.println("Intrinsic: " + t.intrinsicValue);
             System.out.println("market price: " + price);
 
-            if (priceDistortion > 0) {
+            if (Math.abs(priceDistortion) < t.intrinsicValue * 0.008) {
+              System.out.println("Trader holds");
+
+            } else if (priceDistortion > 0) {
 
               int buyVolume =
-                  (int) Math.ceil(priceDistortion
-                      * t.getGlobals().sensitivity
-                      * t.getGlobals().weighting); // weight before buy / sell
+                  (int) Math.ceil(
+                      t.getPrng().normal(priceDistortion, 0.15).sample()
+//                      priceDistortion
+                          * t.getGlobals().sensitivity
+                          * t.getGlobals().weighting); // weight before buy / sell
 
               System.out.println("Amount shares to buy: " + buyVolume);
 
@@ -78,7 +94,9 @@ public class Trader extends Agent<TradingModel.Globals> {
             } else if (priceDistortion < 0) { // sell or short-sell
 
               int sellVolume =
-                  (int) Math.ceil(Math.abs(priceDistortion)
+                  (int) Math.ceil(Math.abs(
+                      t.getPrng().normal(priceDistortion, 0.15).sample())
+//                      priceDistortion)
                       * t.getGlobals().sensitivity
                       * t.getGlobals().weighting);
 
@@ -106,8 +124,13 @@ public class Trader extends Agent<TradingModel.Globals> {
           double p = t.getPrng().uniform(0, 1).sample();
 
           t.intrinsicValue = p >= 0.55
-              ? t.getPrng().normal(price, p).sample() * 0.99
-              : t.getPrng().normal(price, 1-p).sample() * 0.99;
+              ? t.getPrng().normal(price, p).sample() * 0.995
+              : t.getPrng().normal(price, 1 - p).sample() * 0.995;
+
+          // best so far
+//          t.intrinsicValue = p >= 0.55
+//              ? t.getPrng().normal(price, p).sample() * 0.99
+//              : t.getPrng().normal(price, 1-p).sample() * 0.99;
 
 //          t.intrinsicValue = t.getPrng().normal(price, p).sample();
 
@@ -133,10 +156,6 @@ public class Trader extends Agent<TradingModel.Globals> {
     } else {
       handleNotEnoughSharesToSell(sharesToSell);
     }
-//    else {
-    // cannot short more there is short position
-//      System.out.println("Short selling, waiting until short positions are covered");
-//    }
   }
 
   private void handleNotEnoughSharesToSell(double sharesToSell) {
@@ -175,7 +194,6 @@ public class Trader extends Agent<TradingModel.Globals> {
     }
 
     // share < 0: (there are already some short positions)
-
     System.out.println("Hello shares here is " + shares);
     return wealth >= (
         (Math.abs(shares) + sharesToSell) * getGlobals().marketPrice
@@ -222,8 +240,6 @@ public class Trader extends Agent<TradingModel.Globals> {
     if (shares < 0) {
       getLongAccumulator("coverShorts").add((long) amountToBuy);
       getLinks(Links.TradeLink.class).send(Messages.CoverShortPosOrderPlaced.class, amountToBuy);
-
-      System.out.println("heloooooooo");
     }
 
     getLongAccumulator("buys").add((long) amountToBuy);

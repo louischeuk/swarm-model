@@ -14,7 +14,7 @@ public class Messages {
   public static class CoverShortPosOrderPlaced extends Message.Double {}
 
   public static class MarketShock extends Message.Integer {}
-  
+
   public static class Opinion extends Message.Double {}
 
 

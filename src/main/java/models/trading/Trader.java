@@ -1,6 +1,5 @@
 package models.trading;
 
-import models.trading.Messages.MarketPrice;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -9,14 +8,13 @@ import simudyne.core.graph.Message.Double;
 
 public class Trader extends Agent<TradingModel.Globals> {
 
-
-  public enum Type {Momentum, ZI, MI, Opinionated, Coordinated}
+  public enum Type {Noise, Fundamental, Momentum, MI, Opinionated, Coordinated}
 
   ;
    /*
-   Trader type:
-   uninformed/ noise trader: will randomly buy or sell
-   informed/fundamental trader: force to buy and sell at prices bounded by the intrinsic value
+   ------- Trader type -------
+   Noise trader (uninformed): will randomly buy or sell
+   Fundamental trader (informed): force to buy and sell at prices bounded by the intrinsic value
    momentum: buy securities that are rising and sell them when they look to have peaked
    minimal-intelligence trader: adapt to the environment is seen by some as a minimal intelligence
    opinionated: has the knowledge of Limit Order Book.
@@ -46,113 +44,141 @@ public class Trader extends Agent<TradingModel.Globals> {
 
   public boolean isBroke = false;
 
-  @Variable // the total times of transaction of short selling at a moment cannot exceed a int
-  public int numShortingInProcess = 3;
+  // the total times of transaction of short selling at a moment cannot exceed a int
+  public int numShortingInProcess = 0;
 
+  @Variable
   public double opinion; // a real-number between [-1, 1]
 
-
-  @Override
-  public void init() {
-    intrinsicValue = getPrng().normal(getGlobals().marketPrice, getGlobals().stdDev).sample();
-    wealth = getPrng().exponential(1000).sample();
-    shortDuration = getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
-    opinion = getPrng().uniform(-1, 1).sample();
-  }
 
   private static Action<Trader> action(SerializableConsumer<Trader> consumer) {
     return Action.create(Trader.class, consumer);
   }
 
+  public static Action<Trader> processMarketPrice =
+      Action.create(Trader.class,
+          t -> {
+            if (!t.isBroke) {
 
-  public static Action<Trader> processMarketPrice() {
+              double priceDistortion = t.intrinsicValue - t.getGlobals().marketPrice;
 
-    return action(
-        t -> {
+              System.out.println("Intrinsic: " + t.intrinsicValue);
+              System.out.println("market price: " + t.getGlobals().marketPrice);
 
-          if (t.isBroke) {
-            System.out.println("this trader is broke!");
+              double alpha = priceDistortion * t.getGlobals().sensitivity;
+//              t.getPrng().normal(priceDistortion, 0.3).sample()
 
-          } else {
+              // if U(0,1) < alpha: buy / sell
+              if (t.getPrng().uniform(0, 1).sample() < Math.abs(alpha)) {
 
-            double price = t.getGlobals().marketPrice;
-            double priceDistortion = t.intrinsicValue - price;
+                int volume = (int) Math.ceil(Math.abs(alpha));
 
-            System.out.println("Intrinsic: " + t.intrinsicValue);
-            System.out.println("market price: " + price);
+                if (alpha > 0) {        // buy
+                  System.out.println("Amount shares to buy: " + volume);
+                  t.handleWhenBuyShares(t.getGlobals().marketPrice, volume);
 
-            if (Math.abs(priceDistortion) < t.intrinsicValue * 0.01) {
-              System.out.println("Trader holds");
+                } else if (alpha < 0) { // sell
+                  System.out.println("Amount shares to sell: " + volume);
+                  t.handleWhenSellShares(volume);
+                }
 
-            } else if (priceDistortion > 0) {
+              } else {
+                t.hold();
+              }
 
-              int buyVolume =
-                  (int) Math.ceil(
-                      t.getPrng().normal(priceDistortion, 0.2).sample()
-//                      priceDistortion
-                          * t.getGlobals().sensitivity
-                          * t.getGlobals().weighting); // weight before buy / sell
+              if (t.timeSinceShort > -1) { // short selling
+                t.handleDuringShortSelling();
+              }
 
-              System.out.println("Amount shares to buy: " + buyVolume);
-
-              t.handleWhenBuyShares(price, buyVolume);
-
-            } else if (priceDistortion < 0) { // sell or short-sell
-
-              int sellVolume =
-                  (int) Math.ceil(Math.abs(
-                      t.getPrng().normal(priceDistortion, 0.2).sample())
-//                      priceDistortion)
-                      * t.getGlobals().sensitivity
-                      * t.getGlobals().weighting);
-
-              System.out.println("Amount shares to sell: " + sellVolume);
-
-              t.handleWhenSellShares(sellVolume);
-            }
-
-            if (t.timeSinceShort > -1) { // short selling
-              t.handleDuringShortSelling();
+            } else {
+              System.out.println("this trader is broke!");
             }
           }
 
-//          t.sendOpinion(); // send opinion to other individual traders
-        }
+//              if (priceDistortion > 0) {
+//
+//                int buyVolume =
+//                    (int) Math.ceil(
+////
+//                        priceDistortion * t.getGlobals().sensitivity);
+//
+//                System.out.println("Amount shares to buy: " + buyVolume);
+//
+//                t.handleWhenBuyShares(price, buyVolume);
+//
+//              } else if (priceDistortion < 0) { // sell or short-sell
+//
+//                int sellVolume =
+//                    (int) Math.ceil(Math.abs(
+////                      t.getPrng().normal(priceDistortion, 0.3).sample())
+//                        priceDistortion) * t.getGlobals().sensitivity);
+//
+//                System.out.println("Amount shares to sell: " + sellVolume);
+//
+//                t.handleWhenSellShares(sellVolume);
+//              }
+//
+//              if (t.timeSinceShort > -1) { // short selling
+//                t.handleDuringShortSelling();
+//              }
+      );
 
-    );
+  private void hold() {
+    buy(0);
+    sell(0);
+    System.out.println("Trader holds this round");
   }
 
-
   // random walk - brownian motion - keep estimate
-  public static Action<Trader> adjustIntrinsicValue() {
-    return action(
-        t -> {
+  public static Action<Trader> adjustIntrinsicValue =
+      Action.create(Trader.class,
+          t -> {
+            if (t.hasMessageOfType(Messages.MarketShock.class)) {
+              System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
+              t.reactMarketShock();
+            }
 
-          // t.updateOpinion();
+            double step = t.getPrng().
+                gaussian(t.intrinsicValue * 0.01, 4)
+                .sample();
 
-          if (!t.getMessagesOfType(Messages.MarketShock.class).isEmpty()) {
-            System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
-            t.reactMarketShock();
-          }
+            t.intrinsicValue = t.getPrng().uniform(0, 1).sample() >= 0.5
+                ? t.intrinsicValue + Math.abs(step)
+                : t.intrinsicValue - Math.abs(step);
 
-          double price = t.getMessageOfType(MarketPrice.class).getBody();
+            t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
-          double p = t.getPrng().uniform(0, 1).sample();
-          double p2 = t.getPrng().uniform(0.00, 0.05).sample();
-
-          t.intrinsicValue = p >= 0.6
-              ? t.intrinsicValue + t.getPrng().normal(t.intrinsicValue * p2, t.getGlobals().stdDev).sample()
-              : t.intrinsicValue - t.getPrng().normal(t.intrinsicValue * p2, t.getGlobals().stdDev).sample();
-
-          t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
-
-          // best so far
+            // best so far
 //            double p = t.getPrng().uniform(0, 1).sample();
 //            t.intrinsicValue = p >= 0.5
 //                ? t.getPrng().normal(price, p).sample() * 0.996
 //                : t.getPrng().normal(price, 1 - p).sample() * 0.996;
-        });
-  }
+          });
+
+
+  // send opinion to other trader agents
+  public static Action<Trader> sendOpinion =
+      Action.create(Trader.class, t -> {
+        t.getLinks(Links.SocialMediaLink.class).send(Messages.Opinion.class, t.opinion);
+      });
+
+
+  public static Action<Trader> updateOpinion =
+      Action.create(Trader.class, t -> {
+
+        double[] opinionsList = t.getMessagesOfType(Messages.Opinion.class).stream()
+            .mapToDouble(Double::getBody).toArray();
+
+//        System.out.println("Opinion before update: " + t.opinion);
+
+        for (double o : opinionsList) {
+          if (t.getPrng().uniform(0, 1).sample() >= 0.7) {
+            t.opinion += o * 0.005;
+          }
+        }
+
+//        System.out.println("Opinion after update: " + t.opinion);
+      });
 
 
   public void reactMarketShock() {
@@ -160,25 +186,6 @@ public class Trader extends Agent<TradingModel.Globals> {
     intrinsicValue = getPrng().normal(shockPrice, getGlobals().stdDev).sample();
     System.out.println("New intrinsic value: " + intrinsicValue);
   }
-
-  // update the opinion
-  private void sendOpinion() {
-    getLinks(Links.ToEveryTraderLink.class).send(Messages.Opinion.class, opinion);
-  }
-
-  public void updateOpinion() {
-    double[] opinionsList = getMessagesOfType(Messages.Opinion.class).stream()
-        .mapToDouble(Double::getBody).toArray();
-
-    for (double o : opinionsList) {
-      if (opinion != 0) {
-        double confidenceFactor = 1 / Math.abs(o - opinion);
-        opinion += confidenceFactor * o;
-      }
-    }
-    System.out.println("opinion: " + opinion);
-  }
-
 
   private void handleWhenBuyShares(double price, int sharesToBuy) {
     if (hasEnoughWealth(price * sharesToBuy)) {
@@ -247,7 +254,7 @@ public class Trader extends Agent<TradingModel.Globals> {
   }
 
   private void handleDuringShortSelling() {
-    if (isMarginCallTriggered()) {
+    if (isMarginCallTriggered() && !hasEnoughWealthToMaintainMarginAccount()) {
       forceLiquidateShortPosition();
       System.out.println("Oh shit forced to liquidate!");
     }
@@ -299,6 +306,14 @@ public class Trader extends Agent<TradingModel.Globals> {
 //    System.out.println("Current shares: " + shares);
   }
 
+  private boolean hasEnoughWealthToMaintainMarginAccount() {
+    double totalValueOfShorts = Math.abs(shares) * getGlobals().marketPrice;
+    double wealthRequiredInMarginAccount = marginAccount * getGlobals().maintenanceMargin;
+
+    return wealth >= wealthRequiredInMarginAccount - (marginAccount - totalValueOfShorts)
+        && wealth >= wealthRequiredInMarginAccount;
+  }
+
   private boolean isMarginCallTriggered() {
     double totalValueOfShorts = Math.abs(shares) * getGlobals().marketPrice;
     return ((marginAccount - totalValueOfShorts) / totalValueOfShorts)
@@ -308,11 +323,11 @@ public class Trader extends Agent<TradingModel.Globals> {
 
   }
 
-
   private void shortSell(double sharesToShort) {
+
     if (shares < 0) {
-      updateMarginAccount(
-          Math.abs(shares) + sharesToShort); // update margin account with more shorts
+      // update margin account with more shorts
+      updateMarginAccount(Math.abs(shares) + sharesToShort);
     } else {
       initiateMarginAccount(sharesToShort);
     }
@@ -366,14 +381,5 @@ public class Trader extends Agent<TradingModel.Globals> {
     getLinks(Links.TradeLink.class).send(Messages.BuyOrderPlaced.class, 0);
     return false;
   }
-
-//  public static Action<Trader> createNewLink() {
-//    Action.create(Trader.class, a -> {
-//      a.getMessagesOfType(Messages.NewNeighborMessage.class).forEach(msg -> {
-//        a.addLink(targetID, Links.NeighborTrader.class);
-//      });
-//    });
-//  }
-//}
-
 }
+

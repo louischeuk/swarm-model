@@ -1,10 +1,10 @@
 package models.trading;
 
-import models.trading.Links.ToEveryTraderLink;
 import models.trading.Trader.Type;
 import simudyne.core.abm.AgentBasedModel;
 import simudyne.core.abm.GlobalState;
 import simudyne.core.abm.Group;
+import simudyne.core.abm.Split;
 import simudyne.core.annotations.Constant;
 import simudyne.core.annotations.Input;
 import simudyne.core.annotations.ModelSettings;
@@ -13,37 +13,28 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 20;
+  public int numTrader = 10;
 
   public static final class Globals extends GlobalState {
-
-    //    // volatility of market price - use in normal distribution
-//    @Input(name = "Sigma, market price volatility")
-//    public double sigma = 0.35;
-
 
     @Input(name = "Market Price")
     public double marketPrice = 50.0;
 
     // for the net demand of traded stock
     @Input(name = "Exchange's Lambda / Price Elasticity")
-    public double lambda = 0.05;
+    public double lambda = 0.15;
 
-    @Input(name = "standard deviation") // for normal distribution
+    @Input(name = "Standard deviation") // for normal distribution
     public double stdDev = 10;
 
-    // weight before buy or sell
-    @Input(name = "Weighting")
-    public double weighting = 0.3;
-
     @Input(name = "Short Selling duration")
-    public int shortSellDuration = 100;
+    public int shortSellDuration = 200;
 
     @Input(name = "max times of short sell in process")
-    public int maxShortingInProcess = 6;
+    public int maxShortingInProcess = 200;
 
-    @Input(name = "sensitivity")
-    public double sensitivity = 0.25;
+    @Input(name = "Sensitivity to market")
+    public double sensitivity = 0.15;
 
     @Input(name = "Initial Margin Requirement")
     public double initialMarginRequirement = 0.5;
@@ -57,7 +48,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Override
   public void init() {
-
     createLongAccumulator("buys", "Number of buy orders");
     createLongAccumulator("sells", "Number of sell orders");
     createLongAccumulator("shorts", "Number of short sell orders"); // inclusive
@@ -65,42 +55,47 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createDoubleAccumulator("price", "Market price");
 
     registerAgentTypes(Market.class, Trader.class);
-    registerLinkTypes(Links.TradeLink.class,
-        Links.CoordinatedLink.class,
-        Links.ToEveryTraderLink.class);
+    registerLinkTypes(Links.TradeLink.class, Links.SocialMediaLink.class);
+
   }
 
   @Override
   public void setup() {
     Group<Trader> traderGroup = generateGroup(Trader.class, numTrader, t -> {
-      // 20%: coordinated - 50%: opinionated - 20%: momentum - 10%: ZI
+      t.intrinsicValue = t.getPrng().
+          normal(getGlobals().marketPrice, getGlobals().stdDev)
+          .sample();
+      t.wealth = t.getPrng().exponential(100000000).sample();
+//      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
+      t.shortDuration = t.getGlobals().shortSellDuration;
+      t.opinion = t.getPrng().uniform(-1, 1).sample();
 
+      // 20%: Noise-trader | 80%: fundamental-trader (haven't implemented anything yet)
       if (t.getID() < numTrader * 0.2) {
-        t.type = Type.Coordinated;
-        for (int i = 0; i < numTrader * 0.2; i++) { // group the WSB traders
-          t.addLink(i, Links.CoordinatedLink.class);
-        }
-
-      } else if (t.getID() >= numTrader * 0.2 && t.getID() < numTrader * 0.7) {
-        t.type = Type.Opinionated;
-
-      } else if (t.getID() >= numTrader * 0.7 && t.getID() < numTrader * 0.9) {
-        t.type = Type.Momentum;
-
+        t.type = Type.Noise;
       } else {
-        t.type = Type.ZI;
+        t.type = Type.Fundamental;
       }
-
       System.out.println("Trader type: " + t.type);
+
+//        if (t.getID() < numTrader * 0.2) {
+//          t.type = Type.Coordinated;
+//          for (int i = 0; i < numTrader * 0.2; i++) { // group the WSB traders
+//            t.addLink(i, Links.CoordinatedLink.class);
+//          }
+
     });
 
     Group<Market> marketGroup = generateGroup(Market.class, 1,
-        market -> market.numTraders = numTrader);
-
-    traderGroup.fullyConnected(traderGroup, ToEveryTraderLink.class);
+        market -> {
+          market.numTraders = numTrader;
+          market.price = getGlobals().marketPrice;
+        });
 
     traderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
     marketGroup.fullyConnected(traderGroup, Links.TradeLink.class);
+
+    traderGroup.fullyConnected(traderGroup, Links.SocialMediaLink.class);
 
     super.setup();
   }
@@ -109,8 +104,17 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void step() {
     super.step();
 
-    run(Trader.processMarketPrice(),
-        Market.calcPriceImpact(),
-        Trader.adjustIntrinsicValue());
+    run(
+        Split.create(
+            Trader.processMarketPrice,
+            Trader.sendOpinion
+        ),
+        Split.create(
+            Market.calcPriceImpact,
+            Trader.updateOpinion
+        ),
+        Trader.adjustIntrinsicValue
+    );
+
   }
 }

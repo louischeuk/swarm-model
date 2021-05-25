@@ -17,19 +17,13 @@ public class Market extends Agent<TradingModel.Globals> {
 
   int marketShockStep = 100;
 
-  @Override
-  public void init() {
-    price = getGlobals().marketPrice;
-  }
-
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);
   }
 
-  public static Action<Market> calcPriceImpact() {
-    return action(
+  public static Action<Market> calcPriceImpact =
+    Action.create(Market.class,
         m -> {
-
           // get total amount of buys and sells shares for all agents
           double buys = m.getMessagesOfType(Messages.BuyOrderPlaced.class).stream()
               .mapToDouble(Double::getBody).sum();
@@ -70,13 +64,13 @@ public class Market extends Agent<TradingModel.Globals> {
           }
 
           // if marketShock is triggered
-          if (++m.timeStep == m.marketShockStep) {
-            m.getGlobals().isMarketShockTriggered = true;
-            m.getLinks(Links.TradeLink.class)
-                .send(Messages.MarketShock.class, m.marketShockStep);
-          }
-          System.out.println("Time step: " + m.timeStep);
+//          if (++m.timeStep == m.marketShockStep) {
+//            m.getGlobals().isMarketShockTriggered = true;
+//            m.getLinks(Links.TradeLink.class)
+//                .send(Messages.MarketShock.class, m.marketShockStep);
+//          }
+//          System.out.println("Time step: " + m.timeStep);
 
         });
-  }
+
 }

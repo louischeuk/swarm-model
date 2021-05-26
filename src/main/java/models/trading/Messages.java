@@ -15,7 +15,13 @@ public class Messages {
 
   public static class MarketShock extends Message.Integer {}
 
-  public static class Opinion extends Message.Double {}
+  public static class OpinionShared extends Message.Double {}
+
+  public static class SocialMediaOpinion extends Message {
+    double[] opinionList;
+  }
+
+
 
 
 }

@@ -13,7 +13,7 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 20;
+  public int numTrader = 100;
 
   @Constant(name = "Real value of market price")
   public double realValue = 50;
@@ -37,7 +37,12 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public int maxShortingInProcess = 200;
 
     @Input(name = "Sensitivity to market")
-    public double sensitivity = 0.15;
+    public double sensitivity = 0.005;     /*
+                                              tune this w.r.t. total amount of traders
+                                              20  traders - 0.015
+                                              100 traders - 0.005
+                                            */
+
 
     @Input(name = "Initial Margin Requirement")
     public double initialMarginRequirement = 0.5;
@@ -46,6 +51,17 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double maintenanceMargin = 0.3;
 
     public boolean isMarketShockTriggered = false;
+
+    @Input(name = "Confidence factor")
+    public double confidenceFactor = 0.001;
+
+    @Input(name = "Opinion multiple Factor")
+    public double opinionFactor = 500;    /*
+                                            tune it w.r.t to number of traders
+                                            20  traders - 100
+                                            100 traders - 500
+                                          */
+
 
   }
 

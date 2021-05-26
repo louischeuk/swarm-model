@@ -69,7 +69,6 @@ public class Trader extends Agent<TradingModel.Globals> {
               System.out.println("market price: " + t.getGlobals().marketPrice);
 
               double alpha = priceDistortion * t.getGlobals().sensitivity;
-//              t.getPrng().normal(priceDistortion, 0.3).sample()
 
               // if U(0,1) < alpha: buy / sell else hold
               if (t.getPrng().uniform(0, 1).sample() < Math.abs(alpha)
@@ -103,7 +102,7 @@ public class Trader extends Agent<TradingModel.Globals> {
   private void hold() {
     buy(0);
     sell(0);
-    System.out.println("Trader holds this round");
+    System.out.println("Trader holds");
   }
 
   // random walk - brownian motion - keep estimate
@@ -127,17 +126,15 @@ public class Trader extends Agent<TradingModel.Globals> {
 
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
-            // take opinion into account
-            double opinionMultiple =  1 + (t.opinion / 100);
-            System.out.println("opinion multiple: " + opinionMultiple);
-            t.intrinsicValue *= opinionMultiple;
+//            t.adjustIntrinsicWithOpinion();
 
-            // best so far
-//            double p = t.getPrng().uniform(0, 1).sample();
-//            t.intrinsicValue = p >= 0.5
-//                ? t.getPrng().normal(price, p).sample() * 0.996
-//                : t.getPrng().normal(price, 1 - p).sample() * 0.996;
           });
+
+  private void adjustIntrinsicWithOpinion() {
+    double opinionMultiple =  1 + (opinion / getGlobals().opinionFactor);
+//    System.out.println("opinion multiple: " + opinionMultiple);
+    intrinsicValue *= opinionMultiple;
+  }
 
 
   // send opinion to other trader agents
@@ -154,17 +151,17 @@ public class Trader extends Agent<TradingModel.Globals> {
 
 //        System.out.println("Opinion before update: " + t.opinion);
 
-        System.out.println("Opinion thresh : " + t.opinionThresh);
+//        System.out.println("Opinion thresh : " + t.opinionThresh);
 
         int count = 0;
         for (double o : opinionsList) {
           if (t.getPrng().uniform(0, 1).sample() < t.opinionThresh) {
             count++;
-            t.opinion += o * 0.001;
+            t.opinion += o * t.getGlobals().confidenceFactor;
           }
         }
 
-        System.out.println(count + " opinions considered");
+//        System.out.println(count + " opinions considered");
 
 //        System.out.println("Opinion after update: " + t.opinion);
       });
@@ -175,7 +172,7 @@ public class Trader extends Agent<TradingModel.Globals> {
 
         if (t.getPrng().generator.nextInt(2) == 1) {
           t.opinionThresh = t.getPrng().uniform(0, 1).sample();
-          System.out.println("updateOpinionThreshold action here");
+//          System.out.println("updateOpinionThreshold action here");
         }
       });
 
@@ -226,7 +223,7 @@ public class Trader extends Agent<TradingModel.Globals> {
     marginAccount =
         (sharesToShort * getGlobals().marketPrice) * (1 + getGlobals().initialMarginRequirement);
 
-    System.out.println("Margin account: " + marginAccount);
+//    System.out.println("Margin account: " + marginAccount);
   }
 
   private boolean isShortSellAllowed(double sharesToSell) {
@@ -245,7 +242,7 @@ public class Trader extends Agent<TradingModel.Globals> {
     }
 
     // share < 0: (there are already some short positions)
-    System.out.println("Hello shares here is " + shares);
+    System.out.println("Hello short shares here is " + shares);
     return wealth >= (
         (Math.abs(shares) + sharesToSell) * getGlobals().marketPrice
             * getGlobals().initialMarginRequirement);
@@ -343,14 +340,14 @@ public class Trader extends Agent<TradingModel.Globals> {
     }
 
     numShortingInProcess++;
-    System.out.println("Num of short sell in process: " + numShortingInProcess);
+//    System.out.println("Num of short sell in process: " + numShortingInProcess);
   }
 
   private void updateMarginAccount(double sharesToShort) {
     marginAccount =
         sharesToShort * getGlobals().marketPrice * (1 + getGlobals().initialMarginRequirement);
 
-    System.out.println("~~~~~~Margin account updated: " + marginAccount);
+//    System.out.println("~~~~~~Margin account updated: " + marginAccount);
   }
 
   private void sell(double sharesToSell) {

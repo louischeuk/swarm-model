@@ -15,7 +15,7 @@ public class Market extends Agent<TradingModel.Globals> {
 
   int timeStep = 0;
 
-  int marketShockStep = 200;
+  int marketShockStep = 110;
 
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);

@@ -52,7 +52,7 @@ public class Market extends Agent<TradingModel.Globals> {
               double lambda = m.getGlobals().lambda;
               double priceChange = netDemand * lambda;
 
-              System.out.println("Price change: " + priceChange + "\n");
+              System.out.println("Price change: " + priceChange);
 
               m.getGlobals().marketPrice += priceChange;
               m.price = m.getGlobals().marketPrice; // to see in console
@@ -66,7 +66,7 @@ public class Market extends Agent<TradingModel.Globals> {
             if (++m.timeStep == m.marketShockStep) {
               m.triggerMarketShock();
             }
-            System.out.println("Time step: " + m.timeStep);
+            System.out.println("Time step: " + m.timeStep + "\n");
 
           });
 

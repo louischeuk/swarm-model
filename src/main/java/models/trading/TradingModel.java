@@ -13,7 +13,7 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 100;
+  public int numTrader = 20;
 
   @Constant(name = "Real value of market price")
   public double realValue = 50;
@@ -37,12 +37,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public int maxShortingInProcess = 200;
 
     @Input(name = "Sensitivity to market")
-    public double sensitivity = 0.005;     /*
+    public double sensitivity = 0.015;     /*
                                               tune this w.r.t. total amount of traders
                                               20  traders - 0.015
-                                              100 traders - 0.005
+                                              100 traders - 0.015 to 0.07
                                             */
-
 
     @Input(name = "Initial Margin Requirement")
     public double initialMarginRequirement = 0.5;
@@ -56,13 +55,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double confidenceFactor = 0.001;
 
     @Input(name = "Opinion multiple Factor")
-    public double opinionFactor = 500;    /*
-                                            tune it w.r.t to number of traders
-                                            20  traders - 100
-                                            100 traders - 500
-                                          */
-
-
+    public double opinionFactor = 100;      /*
+                                              tune it w.r.t to number of traders
+                                              20  traders - 100
+                                              100 traders - 500 to 1000
+                                            */
   }
 
   @Override
@@ -81,9 +78,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   @Override
   public void setup() {
     Group<Trader> traderGroup = generateGroup(Trader.class, numTrader, t -> {
-      t.intrinsicValue = t.getPrng().
-          normal(realValue, getGlobals().stdDev)
-          .sample();
+      t.intrinsicValue = t.getPrng().normal(realValue, getGlobals().stdDev).sample();
       t.wealth = t.getPrng().exponential(100000000).sample();
 //      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
       t.shortDuration = t.getGlobals().shortSellDuration;

@@ -1,5 +1,6 @@
 package models.trading;
 
+import com.google.errorprone.annotations.Var;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -47,9 +48,10 @@ public class Trader extends Agent<TradingModel.Globals> {
   // the total times of transaction of short selling at a moment cannot exceed a int
   public int numShortingInProcess = 0;
 
-  @Variable
-  public double opinion; // a real-number between [-1, 1]
+  @Variable // a real-number between [-1, 1]
+  public double opinion;
 
+  @Variable // for update the opinion
   public double opinionThresh;
 
 
@@ -62,42 +64,96 @@ public class Trader extends Agent<TradingModel.Globals> {
           t -> {
             if (!t.isBroke) {
 
-              double price = t.getGlobals().marketPrice;
-              double priceDistortion = t.intrinsicValue - price;
-
-              System.out.println("Intrinsic: " + t.intrinsicValue);
-              System.out.println("market price: " + t.getGlobals().marketPrice);
-
-              double alpha = priceDistortion * t.getGlobals().sensitivity;
-
-              // if U(0,1) < alpha: buy / sell else hold
-              if (t.getPrng().uniform(0, 1).sample() < Math.abs(alpha)
-                  && alpha != 0) {
-
-                int volume = (int) Math.ceil(Math.abs(alpha));
-
-                if (alpha > 0) {        // buy
-                  System.out.println("Amount shares to buy: " + volume);
-                  t.handleWhenBuyShares(volume);
-
-                } else if (alpha < 0) { // sell
-                  System.out.println("Amount shares to sell: " + volume);
-                  t.handleWhenSellShares(volume);
-                }
-
-              } else {
-                t.hold();
+              switch (t.type) {
+                case Noise:
+                  t.noiseTraderStrategy();
+                  break;
+                case Fundamental:
+                  t.fundamentalTraderStrategy();
+                  break;
               }
 
               if (t.timeSinceShort > -1) { // short selling
                 t.handleDuringShortSelling();
+                System.out.println("you are short selling");
               }
+
+//              double price = t.getGlobals().marketPrice;
+//              double priceDistortion = t.intrinsicValue - price;
+//
+//              System.out.println("Intrinsic: " + t.intrinsicValue);
+//              System.out.println("market price: " + t.getGlobals().marketPrice);
+//
+//              double alpha = priceDistortion * t.getGlobals().sensitivity;
+//
+//              // if U(0,1) < alpha: buy / sell else hold
+//              if (t.getPrng().uniform(0, 1).sample() < Math.abs(alpha)
+//                  && alpha != 0) {
+//
+//                int volume = (int) Math.ceil(Math.abs(alpha));
+//
+//                if (alpha > 0) {        // buy
+//                  System.out.println("Amount shares to buy: " + volume);
+//                  t.handleWhenBuyShares(volume);
+//
+//                } else if (alpha < 0) { // sell
+//                  System.out.println("Amount shares to sell: " + volume);
+//                  t.handleWhenSellShares(volume);
+//                }
+//
+//              } else {
+//                t.hold();
+//              }
+//
+//              if (t.timeSinceShort > -1) { // short selling
+//                t.handleDuringShortSelling();
+//              }
 
             } else {
               System.out.println("this trader is broke!");
             }
           }
       );
+
+  private void fundamentalTraderStrategy() {
+
+    System.out.println("fundamental trader strategy - implementation as usual");
+
+    double price = getGlobals().marketPrice;
+    double priceDistortion = intrinsicValue - price;
+
+    System.out.println("Intrinsic: " + intrinsicValue);
+    System.out.println("market price: " + getGlobals().marketPrice);
+
+    double alpha = priceDistortion * getGlobals().sensitivity;
+
+    // if U(0,1) < alpha: buy / sell else hold
+    if (getPrng().uniform(0, 1).sample() < Math.abs(alpha)
+        && alpha != 0) {
+
+      int volume = (int) Math.ceil(Math.abs(alpha));
+
+      if (alpha > 0) {        // buy
+        System.out.println("Amount shares to buy: " + volume);
+        handleWhenBuyShares(volume);
+
+      } else if (alpha < 0) { // sell
+        System.out.println("Amount shares to sell: " + volume);
+        handleWhenSellShares(volume);
+      }
+
+    } else {
+      hold();
+    }
+
+//    if (timeSinceShort > -1) { // short selling
+//      handleDuringShortSelling();
+//    }
+  }
+
+  private void noiseTraderStrategy() {
+    System.out.println("noise trader strategy - no implementation yet");
+  }
 
   private void hold() {
     buy(0);
@@ -131,7 +187,7 @@ public class Trader extends Agent<TradingModel.Globals> {
           });
 
   private void adjustIntrinsicWithOpinion() {
-    double opinionMultiple =  1 + (opinion / getGlobals().opinionFactor);
+    double opinionMultiple = 1 + (opinion / getGlobals().opinionFactor);
 //    System.out.println("opinion multiple: " + opinionMultiple);
     intrinsicValue *= opinionMultiple;
   }

@@ -15,7 +15,7 @@ public class Market extends Agent<TradingModel.Globals> {
 
   int timeStep = 0;
 
-  int marketShockStep = 100;
+  int marketShockStep = 200;
 
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);
@@ -62,14 +62,19 @@ public class Market extends Agent<TradingModel.Globals> {
                   .send(Messages.MarketPrice.class, m.getGlobals().marketPrice);
             }
 
-            // if marketShock is triggered
-//            if (++m.timeStep == m.marketShockStep) {
-//              m.getGlobals().isMarketShockTriggered = true;
-//              m.getLinks(Links.TradeLink.class)
-//                  .send(Messages.MarketShock.class, m.marketShockStep);
-//            }
-//            System.out.println("Time step: " + m.timeStep);
+            // check if marketShock is triggered
+            if (++m.timeStep == m.marketShockStep) {
+              m.triggerMarketShock();
+            }
+            System.out.println("Time step: " + m.timeStep);
 
           });
+
+  private void triggerMarketShock() {
+    getGlobals().isMarketShockTriggered = true;
+    getLinks(Links.TradeLink.class)
+        .send(Messages.MarketShock.class, marketShockStep);
+
+  }
 
 }

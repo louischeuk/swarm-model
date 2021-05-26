@@ -16,7 +16,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public int numTrader = 20;
 
   @Constant(name = "Real value of market price")
-  public double realValue = 75;
+  public double realValue = 50;
 
   public static final class Globals extends GlobalState {
 

@@ -127,6 +127,11 @@ public class Trader extends Agent<TradingModel.Globals> {
 
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
+            // take opinion into account
+            double opinionMultiple =  1 + (t.opinion / 100);
+            System.out.println("opinion multiple: " + opinionMultiple);
+            t.intrinsicValue *= opinionMultiple;
+
             // best so far
 //            double p = t.getPrng().uniform(0, 1).sample();
 //            t.intrinsicValue = p >= 0.5
@@ -155,7 +160,7 @@ public class Trader extends Agent<TradingModel.Globals> {
         for (double o : opinionsList) {
           if (t.getPrng().uniform(0, 1).sample() < t.opinionThresh) {
             count++;
-            t.opinion += o * 0.008;
+            t.opinion += o * 0.001;
           }
         }
 

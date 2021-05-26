@@ -50,6 +50,8 @@ public class Trader extends Agent<TradingModel.Globals> {
   @Variable
   public double opinion; // a real-number between [-1, 1]
 
+  public double opinionThresh;
+
 
   private static Action<Trader> action(SerializableConsumer<Trader> consumer) {
     return Action.create(Trader.class, consumer);
@@ -60,7 +62,8 @@ public class Trader extends Agent<TradingModel.Globals> {
           t -> {
             if (!t.isBroke) {
 
-              double priceDistortion = t.intrinsicValue - t.getGlobals().marketPrice;
+              double price = t.getGlobals().marketPrice;
+              double priceDistortion = t.intrinsicValue - price;
 
               System.out.println("Intrinsic: " + t.intrinsicValue);
               System.out.println("market price: " + t.getGlobals().marketPrice);
@@ -68,14 +71,15 @@ public class Trader extends Agent<TradingModel.Globals> {
               double alpha = priceDistortion * t.getGlobals().sensitivity;
 //              t.getPrng().normal(priceDistortion, 0.3).sample()
 
-              // if U(0,1) < alpha: buy / sell
-              if (t.getPrng().uniform(0, 1).sample() < Math.abs(alpha)) {
+              // if U(0,1) < alpha: buy / sell else hold
+              if (t.getPrng().uniform(0, 1).sample() < Math.abs(alpha)
+                  && alpha != 0) {
 
                 int volume = (int) Math.ceil(Math.abs(alpha));
 
                 if (alpha > 0) {        // buy
                   System.out.println("Amount shares to buy: " + volume);
-                  t.handleWhenBuyShares(t.getGlobals().marketPrice, volume);
+                  t.handleWhenBuyShares(volume);
 
                 } else if (alpha < 0) { // sell
                   System.out.println("Amount shares to sell: " + volume);
@@ -94,33 +98,6 @@ public class Trader extends Agent<TradingModel.Globals> {
               System.out.println("this trader is broke!");
             }
           }
-
-//              if (priceDistortion > 0) {
-//
-//                int buyVolume =
-//                    (int) Math.ceil(
-////
-//                        priceDistortion * t.getGlobals().sensitivity);
-//
-//                System.out.println("Amount shares to buy: " + buyVolume);
-//
-//                t.handleWhenBuyShares(price, buyVolume);
-//
-//              } else if (priceDistortion < 0) { // sell or short-sell
-//
-//                int sellVolume =
-//                    (int) Math.ceil(Math.abs(
-////                      t.getPrng().normal(priceDistortion, 0.3).sample())
-//                        priceDistortion) * t.getGlobals().sensitivity);
-//
-//                System.out.println("Amount shares to sell: " + sellVolume);
-//
-//                t.handleWhenSellShares(sellVolume);
-//              }
-//
-//              if (t.timeSinceShort > -1) { // short selling
-//                t.handleDuringShortSelling();
-//              }
       );
 
   private void hold() {
@@ -138,13 +115,15 @@ public class Trader extends Agent<TradingModel.Globals> {
               t.reactMarketShock();
             }
 
-            double step = t.getPrng().
-                gaussian(t.intrinsicValue * 0.01, 4)
-                .sample();
+            int stdDev = 2;
+            double weighting = 0.01;
+            double step = Math.abs(t.getPrng()
+                .gaussian(t.intrinsicValue * weighting, stdDev)
+                .sample());
 
             t.intrinsicValue = t.getPrng().uniform(0, 1).sample() >= 0.5
-                ? t.intrinsicValue + Math.abs(step)
-                : t.intrinsicValue - Math.abs(step);
+                ? t.intrinsicValue + step
+                : t.intrinsicValue - step;
 
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
@@ -158,9 +137,8 @@ public class Trader extends Agent<TradingModel.Globals> {
 
   // send opinion to other trader agents
   public static Action<Trader> sendOpinion =
-      Action.create(Trader.class, t -> {
-        t.getLinks(Links.SocialMediaLink.class).send(Messages.Opinion.class, t.opinion);
-      });
+      Action.create(Trader.class, t ->
+          t.getLinks(Links.SocialMediaLink.class).send(Messages.Opinion.class, t.opinion));
 
 
   public static Action<Trader> updateOpinion =
@@ -171,13 +149,29 @@ public class Trader extends Agent<TradingModel.Globals> {
 
 //        System.out.println("Opinion before update: " + t.opinion);
 
+        System.out.println("Opinion thresh : " + t.opinionThresh);
+
+        int count = 0;
         for (double o : opinionsList) {
-          if (t.getPrng().uniform(0, 1).sample() >= 0.7) {
-            t.opinion += o * 0.005;
+          if (t.getPrng().uniform(0, 1).sample() < t.opinionThresh) {
+            count++;
+            t.opinion += o * 0.008;
           }
         }
 
+        System.out.println(count + " opinions considered");
+
 //        System.out.println("Opinion after update: " + t.opinion);
+      });
+
+
+  public static Action<Trader> updateOpinionThreshold =
+      Action.create(Trader.class, t -> {
+
+        if (t.getPrng().generator.nextInt(2) == 1) {
+          t.opinionThresh = t.getPrng().uniform(0, 1).sample();
+          System.out.println("updateOpinionThreshold action here");
+        }
       });
 
 
@@ -187,8 +181,8 @@ public class Trader extends Agent<TradingModel.Globals> {
     System.out.println("New intrinsic value: " + intrinsicValue);
   }
 
-  private void handleWhenBuyShares(double price, int sharesToBuy) {
-    if (hasEnoughWealth(price * sharesToBuy)) {
+  private void handleWhenBuyShares(int sharesToBuy) {
+    if (hasEnoughWealth(getGlobals().marketPrice * sharesToBuy)) {
       buy(sharesToBuy);
 
       if (shares < 0) {
@@ -311,7 +305,7 @@ public class Trader extends Agent<TradingModel.Globals> {
     double wealthRequiredInMarginAccount = marginAccount * getGlobals().maintenanceMargin;
 
     return wealth >= wealthRequiredInMarginAccount - (marginAccount - totalValueOfShorts)
-        && wealth >= wealthRequiredInMarginAccount;
+        && wealth >= wealthRequiredInMarginAccount; // just double check
   }
 
   private boolean isMarginCallTriggered() {

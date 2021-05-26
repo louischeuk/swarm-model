@@ -13,14 +13,17 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 10;
+  public int numTrader = 20;
+
+  @Constant(name = "Real value of market price")
+  public double realValue = 75;
 
   public static final class Globals extends GlobalState {
 
     @Input(name = "Market Price")
     public double marketPrice = 50.0;
 
-    // for the net demand of traded stock
+    // speed at which the market price converges market equilibrium
     @Input(name = "Exchange's Lambda / Price Elasticity")
     public double lambda = 0.15;
 
@@ -63,12 +66,13 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void setup() {
     Group<Trader> traderGroup = generateGroup(Trader.class, numTrader, t -> {
       t.intrinsicValue = t.getPrng().
-          normal(getGlobals().marketPrice, getGlobals().stdDev)
+          normal(realValue, getGlobals().stdDev)
           .sample();
       t.wealth = t.getPrng().exponential(100000000).sample();
 //      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
       t.shortDuration = t.getGlobals().shortSellDuration;
       t.opinion = t.getPrng().uniform(-1, 1).sample();
+      t.opinionThresh = t.getPrng().uniform(0, 1).sample();
 
       // 20%: Noise-trader | 80%: fundamental-trader (haven't implemented anything yet)
       if (t.getID() < numTrader * 0.2) {
@@ -113,7 +117,10 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
             Market.calcPriceImpact,
             Trader.updateOpinion
         ),
-        Trader.adjustIntrinsicValue
+        Split.create(
+            Trader.adjustIntrinsicValue,
+            Trader.updateOpinionThreshold
+        )
     );
 
   }

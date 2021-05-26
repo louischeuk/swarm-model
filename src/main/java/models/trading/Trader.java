@@ -1,6 +1,5 @@
 package models.trading;
 
-import com.google.errorprone.annotations.Var;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -65,11 +64,11 @@ public class Trader extends Agent<TradingModel.Globals> {
             if (!t.isBroke) {
 
               switch (t.type) {
-                case Noise:
-                  t.noiseTraderStrategy();
-                  break;
                 case Fundamental:
                   t.fundamentalTraderStrategy();
+                  break;
+                case Noise:
+                  t.noiseTraderStrategy();
                   break;
               }
 
@@ -77,37 +76,6 @@ public class Trader extends Agent<TradingModel.Globals> {
                 t.handleDuringShortSelling();
                 System.out.println("you are short selling");
               }
-
-//              double price = t.getGlobals().marketPrice;
-//              double priceDistortion = t.intrinsicValue - price;
-//
-//              System.out.println("Intrinsic: " + t.intrinsicValue);
-//              System.out.println("market price: " + t.getGlobals().marketPrice);
-//
-//              double alpha = priceDistortion * t.getGlobals().sensitivity;
-//
-//              // if U(0,1) < alpha: buy / sell else hold
-//              if (t.getPrng().uniform(0, 1).sample() < Math.abs(alpha)
-//                  && alpha != 0) {
-//
-//                int volume = (int) Math.ceil(Math.abs(alpha));
-//
-//                if (alpha > 0) {        // buy
-//                  System.out.println("Amount shares to buy: " + volume);
-//                  t.handleWhenBuyShares(volume);
-//
-//                } else if (alpha < 0) { // sell
-//                  System.out.println("Amount shares to sell: " + volume);
-//                  t.handleWhenSellShares(volume);
-//                }
-//
-//              } else {
-//                t.hold();
-//              }
-//
-//              if (t.timeSinceShort > -1) { // short selling
-//                t.handleDuringShortSelling();
-//              }
 
             } else {
               System.out.println("this trader is broke!");
@@ -145,10 +113,6 @@ public class Trader extends Agent<TradingModel.Globals> {
     } else {
       hold();
     }
-
-//    if (timeSinceShort > -1) { // short selling
-//      handleDuringShortSelling();
-//    }
   }
 
   private void noiseTraderStrategy() {

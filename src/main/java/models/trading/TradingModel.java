@@ -77,6 +77,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Override
   public void setup() {
+
     Group<Trader> traderGroup = generateGroup(Trader.class, numTrader, t -> {
       t.intrinsicValue = t.getPrng().normal(realValue, getGlobals().stdDev).sample();
       t.wealth = t.getPrng().exponential(100000000).sample();
@@ -85,11 +86,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
       t.opinion = t.getPrng().uniform(-1, 1).sample();
       t.opinionThresh = t.getPrng().uniform(0, 1).sample();
 
-      // 20%: Noise-trader | 80%: fundamental-trader (haven't implemented anything yet)
-      if (t.getID() < numTrader * 0.2) {
-        t.type = Type.Noise;
-      } else {
+      // 80%: fundamental-trader | 20%: Noise-trader (haven't implemented anything yet)
+      if (t.getID() < numTrader * 0.8) {
         t.type = Type.Fundamental;
+      } else {
+        t.type = Type.Noise;
       }
       System.out.println("Trader type: " + t.type);
 

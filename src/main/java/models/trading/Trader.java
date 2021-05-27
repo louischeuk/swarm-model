@@ -7,6 +7,7 @@ import simudyne.core.functions.SerializableConsumer;
 
 public abstract class Trader extends Agent<TradingModel.Globals> {
 
+
   public enum Type {Noise, Fundamental, Momentum, MI, Opinionated, Coordinated}
 
   ;

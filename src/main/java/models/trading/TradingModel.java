@@ -17,28 +17,29 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public int numTrader = 10;
 
   @Constant(name = "Real value of market price")
-  public double realValue = 50;
+  public double realValue = 50.0;
 
   public static final class Globals extends GlobalState {
 
-    @Input(name = "Market Price")
+    @Input(name = "Market price")
     public double marketPrice = 50.0;
 
-    // speed at which the market price converges market equilibrium
-    @Input(name = "Exchange's Lambda / Price Elasticity")
-    public double lambda = 0.15;
+    // aka price elasticity. speed at which the market price converges market equilibrium
+    @Input(name = "Exchange's lambda")
+    public double lambda = 0.2;
 
     @Input(name = "Standard deviation") // for normal distribution
     public double stdDev = 10;
 
-    @Input(name = "Short Selling duration")
+    @Input(name = "Short selling duration")
     public int shortSellDuration = 200;
 
-    @Input(name = "max times of short sell in process")
+    @Input(name = "Max times of short in process")
     public int maxShortingInProcess = 200;
 
     @Input(name = "Sensitivity to market")
-    public double sensitivity = 0.015;     /*
+    public double sensitivity = 0.04;     /*
+                                              higher sensitivity, higher trade volumes
                                               tune this w.r.t. total amount of traders
                                               20  traders - 0.015
                                               100 traders - 0.015 to 0.07
@@ -53,7 +54,9 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public boolean isMarketShockTriggered = false;
 
     @Input(name = "k to scale down the confidence factor")
-    public double k = 1000; // was 0.01
+    public double k = 2000;  /*
+                               range from 500 - 10,000
+                             */
 
     @Input(name = "Opinion multiple Factor")
     public double opinionFactor = 100;      /*
@@ -63,6 +66,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
                                             */
   }
 
+  /* ------------------- model initialisation -------------------*/
   @Override
   public void init() {
     createLongAccumulator("buys", "Number of buy orders");
@@ -72,10 +76,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createDoubleAccumulator("price", "Market price");
 
     registerAgentTypes(
-        Market.class, SocialMedia.class, FundamentalTrader.class, NoiseTrader.class);
+        Market.class,
+        FundamentalTrader.class, NoiseTrader.class,
+        SocialNetwork.class, Influencer.class);
 
-    registerLinkTypes(Links.TradeLink.class, Links.SocialMediaLink.class);
-
+    registerLinkTypes(Links.TradeLink.class, Links.SocialNetworkLink.class);
   }
 
   @Override
@@ -108,13 +113,9 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
         });
 
     Group<NoiseTrader> noiseTraderGroup = generateGroup(NoiseTrader.class, numNoiseTrader, t -> {
-
-      t.intrinsicValue = t.getPrng().normal(realValue, getGlobals().stdDev).sample();
       t.wealth = t.getPrng().exponential(100000000).sample();
 //      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
       t.shortDuration = t.getGlobals().shortSellDuration;
-      t.opinion = t.getPrng().uniform(-1, 1).sample();
-      t.opinionThresh = t.getPrng().uniform(0, 1).sample();
       t.type = Type.Noise;
 
       System.out.println("Trader type: " + t.type);
@@ -126,7 +127,13 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
           market.price = getGlobals().marketPrice;
         });
 
-    Group<SocialMedia> socialMediaGroup = generateGroup(SocialMedia.class, 1);
+    Group<SocialNetwork> socialMediaGroup = generateGroup(SocialNetwork.class, 1);
+
+    Group<Influencer> bigInfluencerGroup = generateGroup(Influencer.class, 1,
+        b -> {
+          b.followers = numFundamentalTrader;
+          b.opinion = 5.0; // much larger than [-1, 1]
+        });
 
     /* ---------------------- connections ---------------------- */
 
@@ -136,11 +143,10 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     noiseTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
     marketGroup.fullyConnected(noiseTraderGroup, Links.TradeLink.class);
 
-    fundamentalTraderGroup.fullyConnected(socialMediaGroup, Links.SocialMediaLink.class);
-    socialMediaGroup.fullyConnected(fundamentalTraderGroup, Links.SocialMediaLink.class);
+    fundamentalTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+    socialMediaGroup.fullyConnected(fundamentalTraderGroup, Links.SocialNetworkLink.class);
 
-    noiseTraderGroup.fullyConnected(socialMediaGroup, Links.SocialMediaLink.class);
-    socialMediaGroup.fullyConnected(noiseTraderGroup, Links.SocialMediaLink.class);
+    bigInfluencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
 
     super.setup();
 
@@ -153,18 +159,19 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     run(
         Split.create(
             Trader.processMarketPrice,
-            Trader.shareOpinion
+            FundamentalTrader.shareOpinion,
+            Influencer.shareOpinion
         ),
         Split.create(
             Market.calcPriceImpact,
             Sequence.create(
-                SocialMedia.publishOpinions,
-                Trader.fetchAndAdjustOpinion
+                SocialNetwork.publishOpinions,
+                FundamentalTrader.fetchAndAdjustOpinion
             )
         ),
         Split.create(
-            Trader.adjustIntrinsicValue,
-            Trader.updateOpinionThreshold
+            FundamentalTrader.adjustIntrinsicValue,
+            FundamentalTrader.updateOpinionThreshold
         )
     );
 

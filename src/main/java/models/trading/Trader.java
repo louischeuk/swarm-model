@@ -1,7 +1,5 @@
 package models.trading;
 
-import models.trading.Messages.OpinionShared;
-import models.trading.Messages.SocialMediaOpinion;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -26,9 +24,6 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   public Type type; // Trader type
 
   @Variable
-  public double intrinsicValue;
-
-  @Variable
   public double wealth;
 
   @Variable
@@ -48,12 +43,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   // the total times of transaction of short selling at a moment cannot exceed a int
   public int numShortingInProcess = 0;
 
-  @Variable // a real-number between [-1, 1]
-  public double opinion;
-
-  @Variable // for update the opinion
-  public double opinionThresh;
-
+  /* ------------------- functions ------------------- */
 
   private static Action<Trader> action(SerializableConsumer<Trader> consumer) {
     return Action.create(Trader.class, consumer);
@@ -83,95 +73,6 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     buy(0);
     sell(0);
     System.out.println("Trader " + getID() + " holds");
-  }
-
-  // random walk - brownian motion - keep estimate
-  public static Action<Trader> adjustIntrinsicValue =
-      action(
-          t -> {
-            if (t.hasMessageOfType(Messages.MarketShock.class)) {
-              System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
-              t.reactMarketShock();
-            }
-
-            int stdDev = 2;
-            double weighting = 0.01;
-            double step = Math.abs(t.getPrng()
-                .gaussian(t.intrinsicValue * weighting, stdDev)
-                .sample());
-
-            t.intrinsicValue = t.getPrng().uniform(0, 1).sample() >= 0.5
-                ? t.intrinsicValue + step
-                : t.intrinsicValue - step;
-
-            t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
-
-//            System.out.println("Trader " + t.getID() + " updated intrinsic value");
-
-//            t.adjustIntrinsicWithOpinion();
-
-          });
-
-  protected void adjustIntrinsicWithOpinion() {
-    double opinionMultiple = 1 + (opinion / getGlobals().opinionFactor);
-//    System.out.println("opinion multiple: " + opinionMultiple);
-    intrinsicValue *= opinionMultiple;
-  }
-
-
-  // send opinion to other trader agents
-  public static Action<Trader> shareOpinion =
-      action(
-          t -> {
-            t.getLinks(Links.SocialMediaLink.class).send(OpinionShared.class, t.opinion);
-            System.out.println("Trader " + t.getID() + " sent opinion");
-          });
-
-
-  public static Action<Trader> fetchAndAdjustOpinion =
-      action(
-          t -> {
-
-            System.out.println("Trader ID " + t.getID() + " received opinion");
-
-            double[] opinionsList = t.getMessageOfType(SocialMediaOpinion.class).opinionList;
-
-//        System.out.println("Opinion before update: " + t.opinion);
-
-//        System.out.println("Opinion thresh : " + t.opinionThresh);
-
-            int count = 0;
-            for (double o : opinionsList) {
-              if (t.getPrng().uniform(0, 1).sample() < t.opinionThresh) {
-                count++;
-
-                double confidenceFactor = 1 / (t.getGlobals().k + t.opinion - o);
-//                System.out.println("Confidence Factor: " + confidenceFactor);
-
-                t.opinion += o * confidenceFactor;
-              }
-            }
-
-            System.out.println(count + " opinions out of " + opinionsList.length + " considered");
-
-//        System.out.println("Opinion after update: " + t.opinion);
-          });
-
-
-  public static Action<Trader> updateOpinionThreshold =
-      action(
-          t -> {
-            if (t.getPrng().generator.nextInt(2) == 1) {
-              t.opinionThresh = t.getPrng().uniform(0, 1).sample();
-              System.out.println("updateOpinionThreshold action here");
-            }
-          });
-
-
-  protected void reactMarketShock() {
-    int shockPrice = getMessageOfType(Messages.MarketShock.class).getBody();
-    intrinsicValue = getPrng().normal(shockPrice, getGlobals().stdDev).sample();
-    System.out.println("New intrinsic value: " + intrinsicValue);
   }
 
   protected void handleWhenBuyShares(int sharesToBuy) {
@@ -311,7 +212,6 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   protected void shortSell(double sharesToShort) {
-
     if (shares < 0) {
       // update margin account with more shorts
       updateMarginAccount(Math.abs(shares) + sharesToShort);

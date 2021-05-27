@@ -6,7 +6,7 @@ public class Links {
 
   public static class TradeLink extends Link.Empty {}
 
-  public static class SocialMediaLink extends Link.Empty {}
+  public static class SocialNetworkLink extends Link.Empty {}
 
 //  public static class CoordinatedLink extends Link.Empty {}
 

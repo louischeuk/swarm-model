@@ -14,7 +14,7 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 10;
+  public int numTrader = 100;
 
   @Constant(name = "Real value of market price")
   public double realValue = 50.0;
@@ -129,10 +129,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     Group<SocialNetwork> socialMediaGroup = generateGroup(SocialNetwork.class, 1);
 
-    Group<Influencer> bigInfluencerGroup = generateGroup(Influencer.class, 1,
+    Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
         b -> {
           b.followers = numFundamentalTrader;
-          b.opinion = 5.0; // much larger than [-1, 1]
+          b.opinion = 1.0;
+          b.probabilityToShare = 0.4;
         });
 
     /* ---------------------- connections ---------------------- */
@@ -146,7 +147,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     fundamentalTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
     socialMediaGroup.fullyConnected(fundamentalTraderGroup, Links.SocialNetworkLink.class);
 
-    bigInfluencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+    influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
 
     super.setup();
 

@@ -17,11 +17,10 @@ public class Messages {
 
   public static class OpinionShared extends Message.Double {}
 
-  public static class SocialMediaOpinion extends Message {
-    double[] opinionList;
-  }
+  public static class InfluencerOpinionShared extends Message.Double{}
 
+  public static class SocialNetworkOpinion extends Message { double[] opinionList; }
 
-
+  public static class InfluencerSocialNetworkOpinion extends Message.Double {}
 
 }

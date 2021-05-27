@@ -1,18 +1,19 @@
 package models.trading;
 
+import models.trading.Messages.InfluencerSocialNetworkOpinion;
+import models.trading.Messages.SocialNetworkOpinion;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
 /* Fundamental trader (informed):
    force to buy and sell at prices bounded by the intrinsic value */
-
 public class FundamentalTrader extends Trader {
 
   @Variable
   public double intrinsicValue;
 
-  @Variable // a real-number between [-1, 1]
+  @Variable // bounded between [-1, 1]
   public double opinion;
 
   @Variable // for update the opinion
@@ -105,11 +106,26 @@ public class FundamentalTrader extends Trader {
           t -> {
             System.out.println("Trader ID " + t.getID() + " received opinion");
 
+            /* take opinion from influencer */
+
+            if (t.hasMessageOfType(InfluencerSocialNetworkOpinion.class)) {
+              double opinionsFromInfluencer = t
+                  .getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
+
+              System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + opinionsFromInfluencer);
+
+              double confidenceFactor = t.getPrng().uniform(0,0.1).sample();
+              t.opinion += (opinionsFromInfluencer - t.opinion) * confidenceFactor;
+              System.out.println("opinion after Elon: " +t.opinion);
+              t.fixOpinionBoundary();
+            }
+
+
+            /* take opinion from other trader agents */
             double[] opinionsList = t
-                .getMessageOfType(Messages.SocialMediaOpinion.class).opinionList;
+                .getMessageOfType(SocialNetworkOpinion.class).opinionList;
 
 //        System.out.println("Opinion before update: " + t.opinion);
-
 //        System.out.println("Opinion thresh : " + t.opinionThresh);
 
             int count = 0;
@@ -117,10 +133,12 @@ public class FundamentalTrader extends Trader {
               if (t.getPrng().uniform(0, 1).sample() < t.opinionThresh) {
                 count++;
 
-                double confidenceFactor = 1 / (t.getGlobals().k + (t.opinion - o));
-                System.out.println("Confidence Factor: " + confidenceFactor);
+//                double confidenceFactor = 1 / (t.getGlobals().k + (t.opinion - o));
+                double confidenceFactor = 0.01 / (Math.abs(o - t.opinion) + 1);
+//                System.out.println("Confidence Factor: " + confidenceFactor);
 
-                t.opinion += o * confidenceFactor;
+                t.opinion += (o - t.opinion) * confidenceFactor;
+                t.fixOpinionBoundary();
               }
             }
 
@@ -129,6 +147,10 @@ public class FundamentalTrader extends Trader {
 //        System.out.println("Opinion after update: " + t.opinion);
           });
 
+  public void fixOpinionBoundary() {
+    opinion = (opinion < 0 && opinion < -1) ? -1 : opinion;
+    opinion = (opinion > 0 && opinion > 1) ? 1 : opinion;
+  }
 
   public static Action<FundamentalTrader> updateOpinionThreshold =
       action(

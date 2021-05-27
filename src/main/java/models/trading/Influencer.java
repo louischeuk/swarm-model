@@ -1,20 +1,21 @@
 package models.trading;
 
-import models.trading.Links.SocialNetworkLink;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
-
-/* like Elon Musk */
+/* eg. Elon Musk */
 public class Influencer extends Agent<TradingModel.Globals> {
 
   @Variable
   public int followers;
 
   @Variable
-  public double opinion;
+  public double opinion; // extremest: either -1 / 1
+
+  @Variable
+  public double probabilityToShare;
 
   private static Action<Influencer> action(SerializableConsumer<Influencer> consumer) {
     return Action.create(Influencer.class, consumer);
@@ -23,8 +24,14 @@ public class Influencer extends Agent<TradingModel.Globals> {
   public static Action<Influencer> shareOpinion =
       action(
           i -> {
-            i.getLinks(SocialNetworkLink.class).send(Messages.OpinionShared.class, i.opinion);
-            System.out.println("Elon Musk (ID: " + i.getID() + ") sent opinion");
+            if (i.getPrng().uniform(0, 1).sample() < i.probabilityToShare) {
+              i.getLinks(Links.SocialNetworkLink.class)
+                  .send(Messages.InfluencerOpinionShared.class, i.opinion);
+              System.out.println("Elon Musk (ID: " + i.getID() + ") sent opinion");
+
+            } else {
+              System.out.println("nope Elon Musk not posting");
+            }
           });
 
 }

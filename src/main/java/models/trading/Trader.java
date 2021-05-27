@@ -37,7 +37,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   @Variable
   public int timeSinceShort = -1;
 
-  @Variable // after this shortDuration, you must cover your short positions
+  // after this shortDuration, you must cover your short positions
   public int shortDuration;
 
   @Variable
@@ -59,9 +59,8 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     return Action.create(Trader.class, consumer);
   }
 
-
   public static Action<Trader> processMarketPrice =
-      Action.create(Trader.class,
+      action(
           t -> {
             if (!t.isBroke) {
 
@@ -88,7 +87,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   // random walk - brownian motion - keep estimate
   public static Action<Trader> adjustIntrinsicValue =
-      Action.create(Trader.class,
+      action(
           t -> {
             if (t.hasMessageOfType(Messages.MarketShock.class)) {
               System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
@@ -107,7 +106,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
-            System.out.println("Trader " + t.getID() + " updated intrinsic value");
+//            System.out.println("Trader " + t.getID() + " updated intrinsic value");
 
 //            t.adjustIntrinsicWithOpinion();
 
@@ -122,46 +121,51 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   // send opinion to other trader agents
   public static Action<Trader> shareOpinion =
-      Action.create(Trader.class, t -> {
-        t.getLinks(Links.SocialMediaLink.class).send(OpinionShared.class, t.opinion);
-        System.out.println("Trader " + t.getID() + " sent opinion");
-      });
+      action(
+          t -> {
+            t.getLinks(Links.SocialMediaLink.class).send(OpinionShared.class, t.opinion);
+            System.out.println("Trader " + t.getID() + " sent opinion");
+          });
 
 
   public static Action<Trader> fetchAndAdjustOpinion =
+      action(
+          t -> {
 
-      Action.create(Trader.class, t -> {
+            System.out.println("Trader ID " + t.getID() + " received opinion");
 
-        System.out.println("Trader ID " + t.getID() + " received opinion");
-
-        double[] opinionsList = t.getMessageOfType(SocialMediaOpinion.class).opinionList;
+            double[] opinionsList = t.getMessageOfType(SocialMediaOpinion.class).opinionList;
 
 //        System.out.println("Opinion before update: " + t.opinion);
 
 //        System.out.println("Opinion thresh : " + t.opinionThresh);
 
-        int count = 0;
-        for (double o : opinionsList) {
-          if (t.getPrng().uniform(0, 1).sample() < t.opinionThresh) {
-            count++;
-            t.opinion += o * t.getGlobals().confidenceFactor;
-          }
-        }
+            int count = 0;
+            for (double o : opinionsList) {
+              if (t.getPrng().uniform(0, 1).sample() < t.opinionThresh) {
+                count++;
 
-        System.out.println(count + " opinions out of " + opinionsList.length + " considered");
+                double confidenceFactor = 1 / (t.getGlobals().k + t.opinion - o);
+//                System.out.println("Confidence Factor: " + confidenceFactor);
+
+                t.opinion += o * confidenceFactor;
+              }
+            }
+
+            System.out.println(count + " opinions out of " + opinionsList.length + " considered");
 
 //        System.out.println("Opinion after update: " + t.opinion);
-      });
+          });
 
 
   public static Action<Trader> updateOpinionThreshold =
-      Action.create(Trader.class, t -> {
-
-        if (t.getPrng().generator.nextInt(2) == 1) {
-          t.opinionThresh = t.getPrng().uniform(0, 1).sample();
-          System.out.println("updateOpinionThreshold action here");
-        }
-      });
+      action(
+          t -> {
+            if (t.getPrng().generator.nextInt(2) == 1) {
+              t.opinionThresh = t.getPrng().uniform(0, 1).sample();
+              System.out.println("updateOpinionThreshold action here");
+            }
+          });
 
 
   protected void reactMarketShock() {

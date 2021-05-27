@@ -1,12 +1,13 @@
 package models.trading;
 
+/* Fundamental trader (informed):
+   force to buy and sell at prices bounded by the intrinsic value */
 public class FundamentalTrader extends Trader {
 
   @Override
   protected void tradeStrategy() {
 
     System.out.println("Trader id: " + getID());
-
     System.out.println("-------------- fundamental trader strategy --------------");
 
     double price = getGlobals().marketPrice;

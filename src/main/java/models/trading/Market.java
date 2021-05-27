@@ -22,7 +22,7 @@ public class Market extends Agent<TradingModel.Globals> {
   }
 
   public static Action<Market> calcPriceImpact =
-      Action.create(Market.class,
+      action(
           m -> {
             // get total amount of buys and sells shares for all agents
             double buys = m.getMessagesOfType(Messages.BuyOrderPlaced.class).stream()
@@ -72,8 +72,7 @@ public class Market extends Agent<TradingModel.Globals> {
 
   private void triggerMarketShock() {
     getGlobals().isMarketShockTriggered = true;
-    getLinks(Links.TradeLink.class)
-        .send(Messages.MarketShock.class, marketShockStep);
+    getLinks(Links.TradeLink.class).send(Messages.MarketShock.class, marketShockStep);
 
   }
 

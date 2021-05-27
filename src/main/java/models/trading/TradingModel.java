@@ -52,8 +52,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     public boolean isMarketShockTriggered = false;
 
-    @Input(name = "Confidence factor")
-    public double confidenceFactor = 0.001;
+    @Input(name = "k to scale down the confidence factor")
+    public double k = 1000; // was 0.01
 
     @Input(name = "Opinion multiple Factor")
     public double opinionFactor = 100;      /*
@@ -72,11 +72,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createDoubleAccumulator("price", "Market price");
 
     registerAgentTypes(
-        Market.class,
-        SocialMedia.class,
-        FundamentalTrader.class,
-        NoiseTrader.class
-    );
+        Market.class, SocialMedia.class, FundamentalTrader.class, NoiseTrader.class);
 
     registerLinkTypes(Links.TradeLink.class, Links.SocialMediaLink.class);
 
@@ -88,6 +84,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     // 80%: fundamental-trader | 20%: Noise-trader (haven't implemented anything yet)
     int numFundamentalTrader = (int) (numTrader * 0.8);
     int numNoiseTrader = (int) (numTrader * 0.2);
+
+    /* ---------------------- Groups creation ---------------------- */
 
     Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
         numFundamentalTrader, t -> {
@@ -130,7 +128,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     Group<SocialMedia> socialMediaGroup = generateGroup(SocialMedia.class, 1);
 
-    /* ------- connections ------- */
+    /* ---------------------- connections ---------------------- */
 
     fundamentalTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
     marketGroup.fullyConnected(fundamentalTraderGroup, Links.TradeLink.class);

@@ -53,11 +53,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     public boolean isMarketShockTriggered = false;
 
-    @Input(name = "k to scale down the confidence factor")
-    public double k = 2000;  /*
-                               range from 500 - 10,000
-                             */
-
     @Input(name = "Opinion multiple Factor")
     public double opinionFactor = 100;      /*
                                               tune it w.r.t to number of traders

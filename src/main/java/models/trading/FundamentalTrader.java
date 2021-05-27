@@ -6,8 +6,7 @@ import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
-/* Fundamental trader (informed):
-   force to buy and sell at prices bounded by the intrinsic value */
+/* Fundamental(informed) trader: force to buy and sell at prices bounded by the intrinsic value */
 public class FundamentalTrader extends Trader {
 
   @Variable
@@ -58,7 +57,6 @@ public class FundamentalTrader extends Trader {
     }
   }
 
-
   /* random walk - brownian motion - keep estimate */
   public static Action<FundamentalTrader> adjustIntrinsicValue =
       action(
@@ -92,7 +90,7 @@ public class FundamentalTrader extends Trader {
     System.out.println("New intrinsic value: " + intrinsicValue);
   }
 
-  /* fetch the opinion from social network and update the self opinion accordingly */
+
   /* share opinion to the social network */
   public static Action<FundamentalTrader> shareOpinion =
       action(
@@ -101,51 +99,63 @@ public class FundamentalTrader extends Trader {
             System.out.println("Trader " + t.getID() + " sent opinion");
           });
 
+  /* fetch the opinion from social network and update the self opinion accordingly */
   public static Action<FundamentalTrader> fetchAndAdjustOpinion =
       action(
           t -> {
             System.out.println("Trader ID " + t.getID() + " received opinion");
-
-            /* take opinion from influencer */
-
-            if (t.hasMessageOfType(InfluencerSocialNetworkOpinion.class)) {
-              double opinionsFromInfluencer = t
-                  .getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
-
-              System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + opinionsFromInfluencer);
-
-              double confidenceFactor = t.getPrng().uniform(0,0.1).sample();
-              t.opinion += (opinionsFromInfluencer - t.opinion) * confidenceFactor;
-              System.out.println("opinion after Elon: " +t.opinion);
-              t.fixOpinionBoundary();
-            }
-
-
-            /* take opinion from other trader agents */
-            double[] opinionsList = t
-                .getMessageOfType(SocialNetworkOpinion.class).opinionList;
-
-//        System.out.println("Opinion before update: " + t.opinion);
-//        System.out.println("Opinion thresh : " + t.opinionThresh);
-
-            int count = 0;
-            for (double o : opinionsList) {
-              if (t.getPrng().uniform(0, 1).sample() < t.opinionThresh) {
-                count++;
-
-//                double confidenceFactor = 1 / (t.getGlobals().k + (t.opinion - o));
-                double confidenceFactor = 0.01 / (Math.abs(o - t.opinion) + 1);
-//                System.out.println("Confidence Factor: " + confidenceFactor);
-
-                t.opinion += (o - t.opinion) * confidenceFactor;
-                t.fixOpinionBoundary();
-              }
-            }
-
-            System.out.println(count + " opinions out of " + opinionsList.length + " considered");
-
-//        System.out.println("Opinion after update: " + t.opinion);
+            t.adjustOpinionWithInfluencerOpinion();
+            t.adjustOpinionWithTradersOpinions();
           });
+
+
+  public void adjustOpinionWithInfluencerOpinion() {
+
+    /* take opinion from influencer */
+
+    if (hasMessageOfType(InfluencerSocialNetworkOpinion.class)) {
+      double opinionsFromInfluencer =
+          getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
+
+      System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + opinionsFromInfluencer);
+
+      double confidenceFactor = getPrng().uniform(0, 0.1).sample();
+      opinion += (opinionsFromInfluencer - opinion) * confidenceFactor;
+      System.out.println("opinion after Elon: " + opinion);
+      fixOpinionBoundary();
+    }
+
+  }
+
+
+  public void adjustOpinionWithTradersOpinions() {
+
+    /* take opinion from other trader agents */
+
+    double[] opinionsList = getMessageOfType(SocialNetworkOpinion.class).opinionList;
+
+//    System.out.println("Opinion before update: " + t.opinion);
+//    System.out.println("Opinion thresh : " + t.opinionThresh);
+
+    int count = 0;
+    for (double o : opinionsList) {
+      if (getPrng().uniform(0, 1).sample() < opinionThresh) {
+        count++;
+
+//        double confidenceFactor = 1 / (t.getGlobals().k + (t.opinion - o));
+        double confidenceFactor = 0.01 / (Math.abs(o - opinion) + 1);
+//        System.out.println("Confidence Factor: " + confidenceFactor);
+
+        opinion += (o - opinion) * confidenceFactor;
+        fixOpinionBoundary();
+      }
+    }
+
+    System.out.println(count + " opinions out of " + opinionsList.length + " considered");
+
+//    System.out.println("Opinion after update: " + t.opinion);
+  }
+
 
   public void fixOpinionBoundary() {
     opinion = (opinion < 0 && opinion < -1) ? -1 : opinion;

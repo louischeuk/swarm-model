@@ -72,39 +72,6 @@ public class Market extends Agent<TradingModel.Globals> {
               m.triggerMarketShock();
             }
             System.out.println("Time step: " + m.timeStep + "\n");
-
-
-
-            //////////////////////////////////////////////////////////////////////////
-
-
-            /* update True value V(t) - random walk: */
-            /* sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j may be == s_v
-               sd_j = 1, lambda = 2 */
-            double jumpDiffusionProcess =
-                m.getPrng().normal(0, 3).sample()
-                    * m.getPrng().poisson(2).sample();
-
-            System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
-
-            System.out.println("prev True value: " + m.getGlobals().trueValue);
-
-            double trueValue = m.getGlobals().trueValue;
-            /*
-               V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process
-                    = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i)
-            */
-            trueValue = trueValue
-                + m.getPrng().normal(0, m.getGlobals().stdDev).sample()
-                + jumpDiffusionProcess;
-
-            trueValue = trueValue < 0 ? 0 : trueValue;
-
-            m.getGlobals().trueValue = trueValue;
-
-            System.out.println("New True value: " + m.getGlobals().trueValue);
-            //////////////////////////////////////////////////////////////////////////
-
           });
 
   private void triggerMarketShock() {
@@ -112,5 +79,39 @@ public class Market extends Agent<TradingModel.Globals> {
     getLinks(Links.TradeLink.class).send(Messages.MarketShock.class, marketShockStep);
 
   }
+
+  /* update true value V(t) - random walk: */
+  public static Action<Market> updateTrueValue =
+      action(m -> {
+
+        /*
+           sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j may be == s_v
+           sd_j = 1, lambda = 2
+        */
+
+        double jumpDiffusionProcess =
+            m.getPrng().normal(0, 3).sample()
+                * m.getPrng().poisson(2).sample();
+
+        System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
+
+        System.out.println("prev True value: " + m.getGlobals().trueValue);
+        double trueValue = m.getGlobals().trueValue;
+
+        /*
+           V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process
+                = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i)
+        */
+        trueValue = trueValue
+            + m.getPrng().normal(0, m.getGlobals().stdDev).sample()
+            + jumpDiffusionProcess;
+
+        trueValue = trueValue < 0 ? 0 : trueValue;
+
+        m.getGlobals().trueValue = trueValue;
+
+        System.out.println("New True value: " + m.getGlobals().trueValue);
+      });
+
 
 }

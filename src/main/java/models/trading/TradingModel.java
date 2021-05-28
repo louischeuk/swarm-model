@@ -14,7 +14,7 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 20;
+  public int numTrader = 10;
 
   public static final class Globals extends GlobalState {
 
@@ -41,7 +41,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double sensitivity = 0.005;     /*
                                               higher sensitivity, higher trade volumes
                                               tune this w.r.t. total amount of traders
-                                              20  traders - 0.015
+                                              10  traders - 0.005
+                                              20  traders - 0.005 to 0.015
                                               100 traders - 0.015 to 0.07
                                             */
 
@@ -66,7 +67,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void init() {
     createLongAccumulator("buys", "Number of buy orders");
     createLongAccumulator("sells", "Number of sell orders");
-    createLongAccumulator("shorts", "Number of short sell orders"); // inclusive
+    createLongAccumulator("shorts", "Number of short sell orders");           // inclusive
     createLongAccumulator("coverShorts", "Number of short position covered"); // inclusive
     createDoubleAccumulator("price", "Market price");
 
@@ -163,8 +164,9 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
             Market.calcPriceImpact,
             Sequence.create(
                 SocialNetwork.publishOpinions,
-                FundamentalTrader.fetchAndAdjustOpinion
-            )
+                FundamentalTrader.fetchAndAdjustSelfOpinion
+            ),
+            Market.updateTrueValue
         ),
         Split.create(
             FundamentalTrader.adjustIntrinsicValue,

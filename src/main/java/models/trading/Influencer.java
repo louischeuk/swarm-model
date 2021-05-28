@@ -9,7 +9,7 @@ public class Influencer extends Agent<TradingModel.Globals> {
 
   public int followers;
 
-  public double opinion; /* extremest: -1.0 / 1.0 */
+  public double opinion; /* extremest: -1.0 or 1.0 */
 
   public double probabilityToShare;
 

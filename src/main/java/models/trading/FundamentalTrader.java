@@ -2,6 +2,7 @@ package models.trading;
 
 import models.trading.Messages.InfluencerSocialNetworkOpinion;
 import models.trading.Messages.SocialNetworkOpinion;
+import models.trading.Messages.TraderOpinionShared;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
@@ -12,11 +13,13 @@ public class FundamentalTrader extends Trader {
   @Variable
   public double intrinsicValue;
 
-  @Variable // bounded between [-1, 1]
-  public double opinion;
+  public double opinion; /* bounded between [-1, 1] */
 
-  @Variable // for update the opinion
-  public double opinionThresh;
+  public double opinionThresh; /* for update the opinion */
+
+  public double zScore; /* v_i(t) = zScore * sd + V(t) | to fixed the direction */
+
+  /* ------------------ functions definition -------------------------*/
 
   private static Action<FundamentalTrader> action(
       SerializableConsumer<FundamentalTrader> consumer) {
@@ -66,17 +69,24 @@ public class FundamentalTrader extends Trader {
               t.reactMarketShock();
             }
 
-            int stdDev = 2;
-            double weighting = 0.01;
-            double step = Math.abs(t.getPrng()
-                .gaussian(t.intrinsicValue * weighting, stdDev)
-                .sample());
-
-            t.intrinsicValue = t.getPrng().uniform(0, 1).sample() >= 0.5
-                ? t.intrinsicValue + step
-                : t.intrinsicValue - step;
-
+            // v_i(t) = z_score * sd  + V(t)
+            // v_i(t) ~ N(V(t), sd) if z_score ~ N(0,1)
+            t.intrinsicValue = t.zScore * t.getGlobals().stdDev + t.getGlobals().trueValue;
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
+
+
+//            int stdDev = 2;
+//            double weighting = 0.01;
+//            double step = Math.abs(t.getPrng()
+//                .gaussian(t.intrinsicValue * weighting, stdDev)
+//                .sample());
+
+
+            // old way
+//            t.intrinsicValue = t.getPrng().uniform(0, 1).sample() >= 0.5
+//                ? t.intrinsicValue + step
+//                : t.intrinsicValue - step;
+//            t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
 //            System.out.println("Trader " + t.getID() + " updated intrinsic value");
 
@@ -84,26 +94,41 @@ public class FundamentalTrader extends Trader {
 
           });
 
+  protected void adjustIntrinsicWithNewOpinion() {
+    double socialNetworkEffect = 1 + (opinion / getGlobals().opinionFactor);
+    System.out.println("Social network effort: " + socialNetworkEffect);
+    intrinsicValue *= socialNetworkEffect;
+
+    /* from Krishnen */
+    /*The simplest model of opinion, with no network, is the z_score (I think the value ~N(V(t), sd),
+    but I am pessimistic and my z_score is -1 and I underestimate V(t) by 1 sd.
+    On my own, based only on my opinion, my v(t) is based on the z_score.
+    Now I see the v(t) of my neighbour or the opinion of my neighbour and this might change my v(t).
+     */
+
+
+  }
+
   protected void reactMarketShock() {
     int shockPrice = getMessageOfType(Messages.MarketShock.class).getBody();
     intrinsicValue = getPrng().normal(shockPrice, getGlobals().stdDev).sample();
     System.out.println("New intrinsic value: " + intrinsicValue);
   }
 
-
   /* share opinion to the social network */
+
   public static Action<FundamentalTrader> shareOpinion =
       action(
           t -> {
-            t.getLinks(Links.SocialNetworkLink.class).send(Messages.OpinionShared.class, t.opinion);
-            System.out.println("Trader " + t.getID() + " sent opinion");
+            t.getLinks(Links.SocialNetworkLink.class).send(TraderOpinionShared.class, t.opinion);
+//            System.out.println("Trader " + t.getID() + " sent opinion");
           });
-
   /* fetch the opinion from social network and update the self opinion accordingly */
+
   public static Action<FundamentalTrader> fetchAndAdjustOpinion =
       action(
           t -> {
-            System.out.println("Trader ID " + t.getID() + " received opinion");
+//            System.out.println("Trader ID " + t.getID() + " received opinion");
             t.adjustOpinionWithInfluencerOpinion();
             t.adjustOpinionWithTradersOpinions();
           });
@@ -114,14 +139,19 @@ public class FundamentalTrader extends Trader {
     /* take opinion from influencer */
 
     if (hasMessageOfType(InfluencerSocialNetworkOpinion.class)) {
-      double opinionsFromInfluencer =
+      double influencerOpinion =
           getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
 
-      System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + opinionsFromInfluencer);
+//      System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + influencerOpinion);
 
-      double confidenceFactor = getPrng().uniform(0, 0.1).sample();
-      opinion += (opinionsFromInfluencer - opinion) * confidenceFactor;
-      System.out.println("opinion after Elon: " + opinion);
+      double influencerEffect = getPrng().uniform(0, 1).sample();
+
+      double confidenceFactor =
+          (1 / (Math.abs(influencerOpinion - opinion) + 1) + influencerEffect);
+
+      // upper-bound of confidence factor: 1
+      opinion += (influencerOpinion - opinion) * Math.min(1, confidenceFactor);
+//      System.out.println("opinion after Elon: " + opinion);
       fixOpinionBoundary();
     }
 
@@ -142,8 +172,7 @@ public class FundamentalTrader extends Trader {
       if (getPrng().uniform(0, 1).sample() < opinionThresh) {
         count++;
 
-//        double confidenceFactor = 1 / (t.getGlobals().k + (t.opinion - o));
-        double confidenceFactor = 0.01 / (Math.abs(o - opinion) + 1);
+        double confidenceFactor = 1 / (Math.abs(o - opinion) + 1);
 //        System.out.println("Confidence Factor: " + confidenceFactor);
 
         opinion += (o - opinion) * confidenceFactor;
@@ -151,7 +180,7 @@ public class FundamentalTrader extends Trader {
       }
     }
 
-    System.out.println(count + " opinions out of " + opinionsList.length + " considered");
+//    System.out.println(count + " opinions out of " + opinionsList.length + " considered");
 
 //    System.out.println("Opinion after update: " + t.opinion);
   }
@@ -167,16 +196,10 @@ public class FundamentalTrader extends Trader {
           t -> {
             if (t.getPrng().generator.nextInt(2) == 1) {
               t.opinionThresh = t.getPrng().uniform(0, 1).sample();
-              System.out.println("updateOpinionThreshold action here");
+//              System.out.println("updateOpinionThreshold action here");
             }
           });
 
-
-  protected void adjustIntrinsicWithNewOpinion() {
-    double opinionMultiple = 1 + (opinion / getGlobals().opinionFactor);
-    System.out.println("opinion multiple: " + opinionMultiple);
-    intrinsicValue *= opinionMultiple;
-  }
 
 
 }

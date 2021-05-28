@@ -24,7 +24,7 @@ public class NoiseTrader extends Trader {
 
     if (getPrng().uniform(0, 1).sample() < 0.4) {
 
-      int volume = (int) getPrng().uniform(-20, 20).sample();
+      int volume = (int) getPrng().normal(0, 10).sample();
 
       System.out.println("Volume: " + volume);
 

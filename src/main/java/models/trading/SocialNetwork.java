@@ -25,8 +25,8 @@ public class SocialNetwork extends Agent<TradingModel.Globals> {
       double influencerOpinion =
           getMessageOfType(Messages.InfluencerOpinionShared.class).getBody();
 
-      System.out.println(
-          "Social media platform received Elon Musk's " + influencerOpinion + " opinion");
+//      System.out.println(
+//          "Social media platform received Elon Musk's " + influencerOpinion + " opinion");
 
       getLinks(Links.SocialNetworkLink.class)
           .send(Messages.InfluencerSocialNetworkOpinion.class, influencerOpinion);
@@ -35,11 +35,11 @@ public class SocialNetwork extends Agent<TradingModel.Globals> {
 
   private void publishTradersOpinions() {
     // handle opinions from trader agent
-    double[] opinionsList = getMessagesOfType(Messages.OpinionShared.class).stream()
+    double[] opinionsList = getMessagesOfType(Messages.TraderOpinionShared.class).stream()
         .mapToDouble(Double::getBody).toArray();
 
-    System.out.println(
-        "Social media platform received " + opinionsList.length + " opinion");
+//    System.out.println(
+//        "Social media platform received " + opinionsList.length + " opinion");
 
     getLinks(Links.SocialNetworkLink.class)
         .send(Messages.SocialNetworkOpinion.class, (m, l) -> m.opinionList = opinionsList);

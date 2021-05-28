@@ -15,7 +15,7 @@ public class Messages {
 
   public static class MarketShock extends Message.Integer {}
 
-  public static class OpinionShared extends Message.Double {}
+  public static class TraderOpinionShared extends Message.Double {}
 
   public static class InfluencerOpinionShared extends Message.Double{}
 

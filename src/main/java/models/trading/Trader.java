@@ -24,19 +24,15 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   public Type type; // Trader type
 
-  @Variable
   public double wealth;
 
-  @Variable
   public double shares = 0;
 
-  @Variable
   public int timeSinceShort = -1;
 
   // after this shortDuration, you must cover your short positions
   public int shortDuration;
 
-  @Variable
   public double marginAccount = 0;
 
   public boolean isBroke = false;

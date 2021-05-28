@@ -14,22 +14,22 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 100;
-
-  @Constant(name = "Real value of market price")
-  public double realValue = 50.0;
+  public int numTrader = 20;
 
   public static final class Globals extends GlobalState {
+
+    @Input(name = "Real value of market price")
+    public double trueValue = 50.0;
 
     @Input(name = "Market price")
     public double marketPrice = 50.0;
 
     // aka price elasticity. speed at which the market price converges market equilibrium
     @Input(name = "Exchange's lambda")
-    public double lambda = 0.2;
+    public double lambda = 0.3;
 
-    @Input(name = "Standard deviation") // for normal distribution
-    public double stdDev = 10;
+    @Input(name = "Standard deviation") // for real value
+    public double stdDev = 5;
 
     @Input(name = "Short selling duration")
     public int shortSellDuration = 200;
@@ -38,7 +38,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public int maxShortingInProcess = 200;
 
     @Input(name = "Sensitivity to market")
-    public double sensitivity = 0.04;     /*
+    public double sensitivity = 0.005;     /*
                                               higher sensitivity, higher trade volumes
                                               tune this w.r.t. total amount of traders
                                               20  traders - 0.015
@@ -81,7 +81,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   @Override
   public void setup() {
 
-    // 80%: fundamental-trader | 20%: Noise-trader (haven't implemented anything yet)
+    // 80%: fundamental-trader | 20%: Noise-trader
     int numFundamentalTrader = (int) (numTrader * 0.8);
     int numNoiseTrader = (int) (numTrader * 0.2);
 
@@ -90,13 +90,14 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
         numFundamentalTrader, t -> {
 
-          t.intrinsicValue = t.getPrng().normal(realValue, getGlobals().stdDev).sample();
+          t.intrinsicValue = t.getPrng().normal(getGlobals().trueValue, getGlobals().stdDev).sample();
           t.wealth = t.getPrng().exponential(100000000).sample();
 //      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
           t.shortDuration = t.getGlobals().shortSellDuration;
           t.opinion = t.getPrng().uniform(-1, 1).sample();
           t.opinionThresh = t.getPrng().uniform(0, 1).sample();
           t.type = Type.Fundamental;
+          t.zScore = t.getPrng().normal(0, 1).sample();
 
           System.out.println("Trader type: " + t.type);
 
@@ -128,7 +129,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
         b -> {
           b.followers = numFundamentalTrader;
           b.opinion = 1.0;
-          b.probabilityToShare = 0.4;
+          b.probabilityToShare = 0.6;
         });
 
     /* ---------------------- connections ---------------------- */

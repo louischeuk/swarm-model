@@ -164,7 +164,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
             Market.calcPriceImpact,
             Sequence.create(
                 SocialNetwork.publishOpinions,
-                FundamentalTrader.fetchAndAdjustSelfOpinion
+                FundamentalTrader.fetchAndAdjustOpinion
             ),
             Market.updateTrueValue
         ),

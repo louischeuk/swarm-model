@@ -1,8 +1,7 @@
 package models.trading;
 
+import models.trading.Links.SocialNetworkLink;
 import models.trading.Messages.InfluencerSocialNetworkOpinion;
-import models.trading.Messages.SocialNetworkOpinion;
-import models.trading.Messages.TraderOpinionShared;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
@@ -110,12 +109,12 @@ public class FundamentalTrader extends Trader {
   public static Action<FundamentalTrader> shareOpinion =
       action(
           t -> {
-            t.getLinks(Links.SocialNetworkLink.class).send(TraderOpinionShared.class, t.opinion);
+            t.getLinks(SocialNetworkLink.class).send(Messages.TraderOpinionShared.class, t.opinion);
             System.out.println("Trader " + t.getID() + " sent opinion");
           });
   /* fetch the opinion from social network and update the self opinion accordingly */
 
-  public static Action<FundamentalTrader> fetchAndAdjustSelfOpinion =
+  public static Action<FundamentalTrader> fetchAndAdjustOpinion =
       action(
           t -> {
             System.out.println("Trader ID " + t.getID() + " received opinion");
@@ -152,7 +151,7 @@ public class FundamentalTrader extends Trader {
 
     /* take opinion from other trader agents */
 
-    double[] opinionsList = getMessageOfType(SocialNetworkOpinion.class).opinionList;
+    double[] opinionsList = getMessageOfType(Messages.SocialNetworkOpinion.class).opinionList;
 
 //    System.out.println("Opinion before update: " + t.opinion);
 //    System.out.println("Opinion thresh : " + t.opinionThresh);

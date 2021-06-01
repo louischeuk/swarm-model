@@ -1,5 +1,6 @@
 package models.trading;
 
+import models.trading.Links.TradeLink;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -176,11 +177,11 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
     if (shares < 0) {
       getLongAccumulator("coverShorts").add((long) amountToBuy);
-      getLinks(Links.TradeLink.class).send(Messages.CoverShortPosOrderPlaced.class, amountToBuy);
+      getLinks(TradeLink.class).send(Messages.CoverShortPosOrderPlaced.class, amountToBuy);
     }
 
     getLongAccumulator("buys").add((long) amountToBuy);
-    getLinks(Links.TradeLink.class).send(Messages.BuyOrderPlaced.class, amountToBuy);
+    getLinks(TradeLink.class).send(Messages.BuyOrderPlaced.class, amountToBuy);
 
 //    System.out.println("Previous wealth: " + wealth);
 
@@ -217,7 +218,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     }
 
     getLongAccumulator("shorts").add((long) sharesToShort);
-    getLinks(Links.TradeLink.class).send(Messages.ShortSellOrderPlaced.class, sharesToShort);
+    getLinks(TradeLink.class).send(Messages.ShortSellOrderPlaced.class, sharesToShort);
 
     System.out.println("shares of short: " + sharesToShort);
 
@@ -241,7 +242,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   protected void sell(double sharesToSell) {
 
     getLongAccumulator("sells").add((long) sharesToSell);
-    getLinks(Links.TradeLink.class).send(Messages.SellOrderPlaced.class, sharesToSell);
+    getLinks(TradeLink.class).send(Messages.SellOrderPlaced.class, sharesToSell);
 
 //    System.out.println("Previous wealth: " + wealth);
 
@@ -262,7 +263,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     }
 
     System.out.println("Not enough money");
-    getLinks(Links.TradeLink.class).send(Messages.BuyOrderPlaced.class, 0);
+    getLinks(TradeLink.class).send(Messages.BuyOrderPlaced.class, 0);
     return false;
   }
 }

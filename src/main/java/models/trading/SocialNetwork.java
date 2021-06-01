@@ -1,5 +1,6 @@
 package models.trading;
 
+import models.trading.Links.SocialNetworkLink;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.functions.SerializableConsumer;
@@ -28,7 +29,7 @@ public class SocialNetwork extends Agent<TradingModel.Globals> {
 //      System.out.println(
 //          "Social media platform received Elon Musk's " + influencerOpinion + " opinion");
 
-      getLinks(Links.SocialNetworkLink.class)
+      getLinks(SocialNetworkLink.class)
           .send(Messages.InfluencerSocialNetworkOpinion.class, influencerOpinion);
     }
   }
@@ -41,7 +42,7 @@ public class SocialNetwork extends Agent<TradingModel.Globals> {
 //    System.out.println(
 //        "Social media platform received " + opinionsList.length + " opinion");
 
-    getLinks(Links.SocialNetworkLink.class)
+    getLinks(SocialNetworkLink.class)
         .send(Messages.SocialNetworkOpinion.class, (m, l) -> m.opinionList = opinionsList);
 
   }

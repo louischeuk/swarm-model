@@ -13,11 +13,15 @@ public class FundamentalTrader extends Trader {
   public double intrinsicValue;
 
   @Variable
-  public double opinion; /* bounded between [-1, 1] */
-
-  public double opinionThresh; /* for update the opinion */
+  public double opinion; /*
+                           opinion = zScore
+                           N(0, 1) for v_i(t) = zScore * sd + V(t)
+                           intention: to fixed the direction of intrinsic
+                           will adjust with the opinion
+                        */
 
   public double zScore; /*
+                           opinion = zScore
                            N(0, 1) for v_i(t) = zScore * sd + V(t)
                            intention: to fixed the direction of intrinsic
                            will adjust with the opinion
@@ -70,7 +74,6 @@ public class FundamentalTrader extends Trader {
           t -> {
             if (t.hasMessageOfType(Messages.MarketShock.class)) {
               System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
-              t.reactMarketShock();
             }
 
             /*
@@ -89,20 +92,19 @@ public class FundamentalTrader extends Trader {
                 Now I see the v(t) of my neighbour or the opinion of my neighbour
                 and this might change my v(t).
             */
+
+            System.out.println("Trader " + t.getID() + " prev intrinsic value: " + t.intrinsicValue);
+
             t.intrinsicValue =
-                (t.zScore + t.opinion) * t.getGlobals().stdDev + t.getGlobals().trueValue;
+                (t.zScore) * t.getGlobals().stdDev + t.getGlobals().trueValue;
+
+            // opinion might be added separately
 
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
-//            System.out.println("Trader " + t.getID() + " updated intrinsic value");
+            System.out.println("Trader " + t.getID() + " new intrinsic value: " + t.intrinsicValue);
           });
 
-
-  protected void reactMarketShock() {
-    int shockPrice = getMessageOfType(Messages.MarketShock.class).getBody();
-    intrinsicValue = getPrng().normal(shockPrice, getGlobals().stdDev).sample();
-    System.out.println("New intrinsic value: " + intrinsicValue);
-  }
 
   /* share opinion to the social network */
 
@@ -154,40 +156,26 @@ public class FundamentalTrader extends Trader {
     double[] opinionsList = getMessageOfType(Messages.SocialNetworkOpinion.class).opinionList;
 
 //    System.out.println("Opinion before update: " + t.opinion);
-//    System.out.println("Opinion thresh : " + t.opinionThresh);
 
-    int count = 0;
     for (double o : opinionsList) {
-      if (getPrng().uniform(0, 1).sample() < opinionThresh) {
-        count++;
+//        double confidenceFactor = 1 / (Math.abs(o - opinion) + 1);
+      double confidenceFactor = 0.4; // hard coded for now
 
-        double confidenceFactor = 1 / (Math.abs(o - opinion) + 1);
 //        System.out.println("Confidence Factor: " + confidenceFactor);
 
-        opinion += (o - opinion) * confidenceFactor;
-        fixOpinionBoundary();
-      }
-    }
+      opinion += (o - opinion) * confidenceFactor;
+      fixOpinionBoundary();
+  }
 
-    System.out.println(count + " opinions out of " + opinionsList.length + " considered");
+//    System.out.println(opinionsList.length + " opinions considered");
 
 //    System.out.println("Opinion after update: " + t.opinion);
-  }
+}
 
 
   public void fixOpinionBoundary() {
     opinion = (opinion < 0 && opinion < -1) ? -1 : opinion;
     opinion = (opinion > 0 && opinion > 1) ? 1 : opinion;
   }
-
-  public static Action<FundamentalTrader> updateOpinionThreshold =
-      action(
-          t -> {
-            if (t.getPrng().generator.nextInt(2) == 1) {
-              t.opinionThresh = t.getPrng().uniform(0, 1).sample();
-              System.out.println("updateOpinionThreshold action here");
-            }
-          });
-
 
 }

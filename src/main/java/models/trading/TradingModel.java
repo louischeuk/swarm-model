@@ -16,13 +16,19 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   @Constant(name = "Number of Traders")
   public int numTrader = 10;
 
+  @Input(name = "Proportion of FT traders")
+  public double proportionFTTraders = 90;
+
+  @Input(name = "Proportion of Noise traders")
+  public double proportionNoiseTraders = 10;
+
   public static final class Globals extends GlobalState {
 
-    @Input(name = "Real value of market price")
-    public double trueValue = 50.0;
-
     @Input(name = "Market price")
-    public double marketPrice = 50.0;
+    public double marketPrice = 80.0;
+
+    @Input(name = "Real value of market price")
+    public double trueValue = 100.0;
 
     // aka price elasticity. speed at which the market price converges market equilibrium
     @Input(name = "Exchange's lambda")
@@ -52,15 +58,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     @Input(name = "Maintenance Margin")
     public double maintenanceMargin = 0.3;
 
-    public boolean isMarketShockTriggered = false;
-
-    @Input(name = "Opinion multiple Factor")
-    public double opinionFactor = 100;      /*
-                                              tune it w.r.t to number of traders
-                                              20  traders - 100
-                                              100 traders - 500 to 1000
-                                            */
   }
+
 
   /* ------------------- model initialisation -------------------*/
   @Override
@@ -82,21 +81,21 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   @Override
   public void setup() {
 
-    // 80%: fundamental-trader | 20%: Noise-trader
-    int numFundamentalTrader = (int) (numTrader * 0.8);
-    int numNoiseTrader = (int) (numTrader * 0.2);
+    /* proportion of traders */
+    int numFundamentalTrader = (int) (numTrader * (proportionFTTraders / 100));
+    int numNoiseTrader = (int) (numTrader * (proportionNoiseTraders / 100));
 
     /* ---------------------- Groups creation ---------------------- */
 
     Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
         numFundamentalTrader, t -> {
 
-          t.intrinsicValue = t.getPrng().normal(getGlobals().trueValue, getGlobals().stdDev).sample();
+          t.intrinsicValue = t.getPrng().normal(getGlobals().trueValue, getGlobals().stdDev)
+              .sample();
           t.wealth = t.getPrng().exponential(100000000).sample();
 //      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
           t.shortDuration = t.getGlobals().shortSellDuration;
           t.opinion = t.getPrng().uniform(-1, 1).sample();
-          t.opinionThresh = t.getPrng().uniform(0, 1).sample();
           t.type = Type.Fundamental;
           t.zScore = t.getPrng().normal(0, 1).sample();
 
@@ -126,12 +125,12 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     Group<SocialNetwork> socialMediaGroup = generateGroup(SocialNetwork.class, 1);
 
-    Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
-        b -> {
-          b.followers = numFundamentalTrader;
-          b.opinion = 1.0;
-          b.probabilityToShare = 0.6;
-        });
+//    Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
+//        b -> {
+//          b.followers = numFundamentalTrader;
+//          b.opinion = 1.0;
+//          b.probabilityToShare = 0.6;
+//        });
 
     /* ---------------------- connections ---------------------- */
 
@@ -144,7 +143,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     fundamentalTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
     socialMediaGroup.fullyConnected(fundamentalTraderGroup, Links.SocialNetworkLink.class);
 
-    influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+//    influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
 
     super.setup();
 
@@ -168,10 +167,10 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
             ),
             Market.updateTrueValue
         ),
-        Split.create(
-            FundamentalTrader.adjustIntrinsicValue,
-            FundamentalTrader.updateOpinionThreshold
-        )
+//        Split.create(
+            FundamentalTrader.adjustIntrinsicValue
+//            FundamentalTrader.updateOpinionThreshold
+//        )
     );
 
   }

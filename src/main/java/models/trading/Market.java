@@ -15,7 +15,7 @@ public class Market extends Agent<TradingModel.Globals> {
 
   int timeStep = 0;
 
-  int marketShockStep = 110;
+  int marketShockStep = 50;
 
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);
@@ -69,13 +69,13 @@ public class Market extends Agent<TradingModel.Globals> {
 
             // check if marketShock is triggered
             if (++m.timeStep == m.marketShockStep) {
-              m.triggerMarketShock();
+//              m.triggerMarketShock();
             }
             System.out.println("Time step: " + m.timeStep + "\n");
           });
 
   private void triggerMarketShock() {
-    getGlobals().isMarketShockTriggered = true;
+    getGlobals().trueValue = 150; // hard care when testing
     getLinks(Links.TradeLink.class).send(Messages.MarketShock.class, marketShockStep);
 
   }
@@ -88,7 +88,6 @@ public class Market extends Agent<TradingModel.Globals> {
            sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j may be == s_v
            sd_j = 1, lambda = 2
         */
-
         double jumpDiffusionProcess =
             m.getPrng().normal(0, 3).sample()
                 * m.getPrng().poisson(2).sample();
@@ -96,19 +95,19 @@ public class Market extends Agent<TradingModel.Globals> {
         System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
 
         System.out.println("prev True value: " + m.getGlobals().trueValue);
-        double trueValue = m.getGlobals().trueValue;
 
         /*
            V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process
                 = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i)
         */
-        trueValue = trueValue
+        m.getGlobals().trueValue =
+            m.getGlobals().trueValue
             + m.getPrng().normal(0, m.getGlobals().stdDev).sample()
             + jumpDiffusionProcess;
 
-        trueValue = trueValue < 0 ? 0 : trueValue;
-
-        m.getGlobals().trueValue = trueValue;
+        if (m.getGlobals().trueValue < 0) {
+          m.getGlobals().trueValue = 0;
+        }
 
         System.out.println("New True value: " + m.getGlobals().trueValue);
       });

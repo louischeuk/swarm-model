@@ -22,10 +22,8 @@ public class NoiseTrader extends Trader {
     System.out.println("Trader id: " + getID());
     System.out.println("^^^^^^^^^ noise trader strategy ^^^^^^^^^");
 
-    if (getPrng().uniform(0, 1).sample() < 0.4) {
-
-      int volume = (int) getPrng().normal(0, 10).sample();
-
+      // volume = N(0, 10)
+      int volume = (int) getPrng().normal(0, getGlobals().stdDev).sample();
       System.out.println("Volume: " + volume);
 
       if (volume > 0) {
@@ -33,10 +31,6 @@ public class NoiseTrader extends Trader {
       } else {
         handleWhenSellShares(Math.abs(volume));
       }
-
-    } else {
-      hold();
-    }
   }
 
 }

@@ -13,19 +13,20 @@ public class FundamentalTrader extends Trader {
   public double intrinsicValue;
 
   @Variable
+  public double intrinsicNoOpinionDynamics;
+
+  @Variable
+  public double zScore; /* intrinsic Value without opinion for comparison */
+
+  @Variable
   public double opinion; /*
                            opinion = zScore
-                           N(0, 1) for v_i(t) = zScore * sd + V(t)
+                                   = N(0, 1) for v_i(t) = opinion * sd + V(t)
                            intention: to fixed the direction of intrinsic
                            will adjust with the opinion
                         */
 
-  public double zScore; /*
-                           opinion = zScore
-                           N(0, 1) for v_i(t) = zScore * sd + V(t)
-                           intention: to fixed the direction of intrinsic
-                           will adjust with the opinion
-                        */
+
 
   /* ------------------ functions definition -------------------------*/
 
@@ -78,31 +79,32 @@ public class FundamentalTrader extends Trader {
 
             /*
                --- intrinsic value (v_i(t) for trader i, step t) without opinion ---
-               v_i(t) = z_score * sd  + V(t)
-               v_i(t) ~ N(V(t), sd) if z_score ~ N(0,1)
-
-                --- Update intrinsic value with opinion ---
-
-                v_i(t) = (z_score + opinion) * sd  + V(t)
+               v_i(t) = opinion * sd  + V(t)
+               v_i(t) ~ N(V(t), sd) if opinion ~ N(0,1)
 
                 The simplest model of opinion, with no network,
-                is the z_score (I think the value ~N(V(t), sd),
+                is the opinion (I think the value ~N(V(t), sd),
                 but I am pessimistic and my z_score is -1 and I underestimate V(t) by 1 sd.
-                On my own, based only on my opinion, my v(t) is based on the z_score.
+                On my own, based only on my opinion, my v(t) is based on the opinion.
                 Now I see the v(t) of my neighbour or the opinion of my neighbour
                 and this might change my v(t).
             */
 
-            System.out.println("Trader " + t.getID() + " prev intrinsic value: " + t.intrinsicValue);
+//            System.out
+//                .println("Trader " + t.getID() + " prev intrinsic value: " + t.intrinsicValue);
 
-            t.intrinsicValue =
-                (t.zScore) * t.getGlobals().stdDev + t.getGlobals().trueValue;
+            System.out.println("zScore: " + t.zScore);
+            //////////////
+            t.intrinsicNoOpinionDynamics =
+                t.zScore * t.getGlobals().stdDev + t.getGlobals().trueValue;
+            t.intrinsicNoOpinionDynamics =
+                t.intrinsicNoOpinionDynamics <= 0 ? 0 : t.intrinsicNoOpinionDynamics;
+            //////////////
 
-            // opinion might be added separately
-
+            t.intrinsicValue = (t.opinion) * t.getGlobals().stdDev + t.getGlobals().trueValue;
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
-            System.out.println("Trader " + t.getID() + " new intrinsic value: " + t.intrinsicValue);
+//            System.out.println("Trader " + t.getID() + " new intrinsic value: " + t.intrinsicValue);
           });
 
 
@@ -114,15 +116,35 @@ public class FundamentalTrader extends Trader {
             t.getLinks(SocialNetworkLink.class).send(Messages.TraderOpinionShared.class, t.opinion);
             System.out.println("Trader " + t.getID() + " sent opinion");
           });
-  /* fetch the opinion from social network and update the self opinion accordingly */
 
+  /* fetch the opinion from social network and update the self opinion accordingly */
   public static Action<FundamentalTrader> fetchAndAdjustOpinion =
       action(
           t -> {
             System.out.println("Trader ID " + t.getID() + " received opinion");
-            t.adjustOpinionWithInfluencerOpinion();
+//            t.adjustOpinionWithInfluencerOpinion();
             t.adjustOpinionWithTradersOpinions();
           });
+
+  /* take opinion from other trader agents */
+  public void adjustOpinionWithTradersOpinions() {
+
+    double[] opinionsList = getMessageOfType(Messages.SocialNetworkOpinion.class).opinionList;
+
+//    System.out.println("Opinion before update: " + opinion);
+
+    getDoubleAccumulator("opinions").add(opinion);
+
+    for (double o : opinionsList) {
+
+//        double confidenceFactor = 1 / (Math.abs(o - opinion) + 1);
+
+      opinion += (o - opinion) * getGlobals().confidenceFactor;
+    }
+
+//    System.out.println(opinionsList.length + " opinions considered");
+//    System.out.println("Opinion after update: " + opinion);
+  }
 
 
   public void adjustOpinionWithInfluencerOpinion() {
@@ -143,39 +165,7 @@ public class FundamentalTrader extends Trader {
       // upper-bound of confidence factor: 1
       opinion += (influencerOpinion - opinion) * Math.min(1, confidenceFactor);
 //      System.out.println("opinion after Elon: " + opinion);
-      fixOpinionBoundary();
     }
 
   }
-
-
-  public void adjustOpinionWithTradersOpinions() {
-
-    /* take opinion from other trader agents */
-
-    double[] opinionsList = getMessageOfType(Messages.SocialNetworkOpinion.class).opinionList;
-
-//    System.out.println("Opinion before update: " + t.opinion);
-
-    for (double o : opinionsList) {
-//        double confidenceFactor = 1 / (Math.abs(o - opinion) + 1);
-      double confidenceFactor = 0.4; // hard coded for now
-
-//        System.out.println("Confidence Factor: " + confidenceFactor);
-
-      opinion += (o - opinion) * confidenceFactor;
-      fixOpinionBoundary();
-  }
-
-//    System.out.println(opinionsList.length + " opinions considered");
-
-//    System.out.println("Opinion after update: " + t.opinion);
-}
-
-
-  public void fixOpinionBoundary() {
-    opinion = (opinion < 0 && opinion < -1) ? -1 : opinion;
-    opinion = (opinion > 0 && opinion > 1) ? 1 : opinion;
-  }
-
 }

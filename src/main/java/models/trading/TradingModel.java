@@ -1,5 +1,7 @@
 package models.trading;
 
+import java.util.ArrayList;
+import java.util.List;
 import models.trading.Trader.Type;
 import simudyne.core.abm.AgentBasedModel;
 import simudyne.core.abm.GlobalState;
@@ -14,13 +16,13 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 10;
+  public int numTrader = 3;
 
   @Input(name = "Proportion of FT traders")
-  public double proportionFTTraders = 90;
+  public double proportionFTTraders = 100;
 
   @Input(name = "Proportion of Noise traders")
-  public double proportionNoiseTraders = 10;
+  public double proportionNoiseTraders = 0;
 
   public static final class Globals extends GlobalState {
 
@@ -30,7 +32,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     @Input(name = "Real value of market price")
     public double trueValue = 100.0;
 
-    // aka price elasticity. speed at which the market price converges market equilibrium
+    /* aka price elasticity. speed at which the market price converges market equilibrium */
     @Input(name = "Exchange's lambda")
     public double lambda = 0.3;
 
@@ -58,6 +60,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     @Input(name = "Maintenance Margin")
     public double maintenanceMargin = 0.3;
 
+    public List<Double> priceHistory = new ArrayList<>(); /* store the price */
+
+    @Input(name = "Confidence Factor")
+    public double confidenceFactor = 0.5; /* speed of convergence of opinions */
+
   }
 
 
@@ -69,6 +76,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createLongAccumulator("shorts", "Number of short sell orders");           // inclusive
     createLongAccumulator("coverShorts", "Number of short position covered"); // inclusive
     createDoubleAccumulator("price", "Market price");
+    createDoubleAccumulator("opinions", "Opinions");
+
 
     registerAgentTypes(
         Market.class,
@@ -95,9 +104,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
           t.wealth = t.getPrng().exponential(100000000).sample();
 //      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
           t.shortDuration = t.getGlobals().shortSellDuration;
-          t.opinion = t.getPrng().uniform(-1, 1).sample();
           t.type = Type.Fundamental;
-          t.zScore = t.getPrng().normal(0, 1).sample();
+          t.opinion = t.getPrng().normal(0, 1).sample();
+          t.zScore = t.opinion;
+
+          t.intrinsicNoOpinionDynamics = t.intrinsicValue;
 
           System.out.println("Trader type: " + t.type);
 
@@ -108,14 +119,14 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 //          }
         });
 
-    Group<NoiseTrader> noiseTraderGroup = generateGroup(NoiseTrader.class, numNoiseTrader, t -> {
-      t.wealth = t.getPrng().exponential(100000000).sample();
-//      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
-      t.shortDuration = t.getGlobals().shortSellDuration;
-      t.type = Type.Noise;
-
-      System.out.println("Trader type: " + t.type);
-    });
+//    Group<NoiseTrader> noiseTraderGroup = generateGroup(NoiseTrader.class, numNoiseTrader, t -> {
+//      t.wealth = t.getPrng().exponential(100000000).sample();
+////      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
+//      t.shortDuration = t.getGlobals().shortSellDuration;
+//      t.type = Type.Noise;
+//
+//      System.out.println("Trader type: " + t.type);
+//    });
 
     Group<Market> marketGroup = generateGroup(Market.class, 1,
         market -> {
@@ -137,8 +148,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     fundamentalTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
     marketGroup.fullyConnected(fundamentalTraderGroup, Links.TradeLink.class);
 
-    noiseTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
-    marketGroup.fullyConnected(noiseTraderGroup, Links.TradeLink.class);
+//    noiseTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
+//    marketGroup.fullyConnected(noiseTraderGroup, Links.TradeLink.class);
 
     fundamentalTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
     socialMediaGroup.fullyConnected(fundamentalTraderGroup, Links.SocialNetworkLink.class);
@@ -167,10 +178,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
             ),
             Market.updateTrueValue
         ),
-//        Split.create(
-            FundamentalTrader.adjustIntrinsicValue
-//            FundamentalTrader.updateOpinionThreshold
-//        )
+        FundamentalTrader.adjustIntrinsicValue
     );
 
   }

@@ -24,6 +24,9 @@ public class Market extends Agent<TradingModel.Globals> {
   public static Action<Market> calcPriceImpact =
       action(
           m -> {
+
+            m.getGlobals().priceHistory.add(m.price);
+
             // get total amount of buys and sells shares for all agents
             double buys = m.getMessagesOfType(Messages.BuyOrderPlaced.class).stream()
                 .mapToDouble(Double::getBody).sum();

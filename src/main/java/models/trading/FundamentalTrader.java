@@ -13,10 +13,8 @@ public class FundamentalTrader extends Trader {
   public double intrinsicValue;
 
   @Variable
-  public double intrinsicNoOpinionDynamics;
+  public double intrinsicNoOpnDynamics;
 
-  @Variable
-  public double zScore; /* intrinsic Value without opinion for comparison */
 
   @Variable
   public double opinion; /*
@@ -26,7 +24,8 @@ public class FundamentalTrader extends Trader {
                            will adjust with the opinion
                         */
 
-
+  @Variable
+  public double zScore; /* intrinsic Value without opinion for comparison */
 
   /* ------------------ functions definition -------------------------*/
 
@@ -50,8 +49,7 @@ public class FundamentalTrader extends Trader {
     double alpha = priceDistortion * getGlobals().sensitivity;
 
     // if U(0,1) < alpha: buy / sell else hold
-    if (getPrng().uniform(0, 1).sample() < Math.abs(alpha)
-        && alpha != 0) {
+    if ((getPrng().uniform(0, 1).sample() < Math.abs(alpha)) && alpha != 0) {
 
       int volume = (int) Math.ceil(Math.abs(alpha));
 
@@ -77,31 +75,19 @@ public class FundamentalTrader extends Trader {
               System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
             }
 
+//            System.out.println("Trader " + t.getID() + " prev intrinsic value: " + t.intrinsicValue);
+
             /*
+               control set-up: absent of social network
                --- intrinsic value (v_i(t) for trader i, step t) without opinion ---
                v_i(t) = opinion * sd  + V(t)
                v_i(t) ~ N(V(t), sd) if opinion ~ N(0,1)
-
-                The simplest model of opinion, with no network,
-                is the opinion (I think the value ~N(V(t), sd),
-                but I am pessimistic and my z_score is -1 and I underestimate V(t) by 1 sd.
-                On my own, based only on my opinion, my v(t) is based on the opinion.
-                Now I see the v(t) of my neighbour or the opinion of my neighbour
-                and this might change my v(t).
             */
+            t.intrinsicNoOpnDynamics = t.zScore * t.getGlobals().stdDev + t.getGlobals().trueValue;
+            t.intrinsicNoOpnDynamics = t.intrinsicNoOpnDynamics <= 0 ? 0 : t.intrinsicNoOpnDynamics;
 
-//            System.out
-//                .println("Trader " + t.getID() + " prev intrinsic value: " + t.intrinsicValue);
-
-            System.out.println("zScore: " + t.zScore);
-            //////////////
-            t.intrinsicNoOpinionDynamics =
-                t.zScore * t.getGlobals().stdDev + t.getGlobals().trueValue;
-            t.intrinsicNoOpinionDynamics =
-                t.intrinsicNoOpinionDynamics <= 0 ? 0 : t.intrinsicNoOpinionDynamics;
-            //////////////
-
-            t.intrinsicValue = (t.opinion) * t.getGlobals().stdDev + t.getGlobals().trueValue;
+            /* update intrinsic with social network */
+            t.intrinsicValue = (t.opinion * t.getGlobals().stdDev) + t.getGlobals().trueValue;
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
 
 //            System.out.println("Trader " + t.getID() + " new intrinsic value: " + t.intrinsicValue);
@@ -109,7 +95,6 @@ public class FundamentalTrader extends Trader {
 
 
   /* share opinion to the social network */
-
   public static Action<FundamentalTrader> shareOpinion =
       action(
           t -> {
@@ -122,7 +107,7 @@ public class FundamentalTrader extends Trader {
       action(
           t -> {
             System.out.println("Trader ID " + t.getID() + " received opinion");
-//            t.adjustOpinionWithInfluencerOpinion();
+            t.adjustOpinionWithInfluencerOpinion();
             t.adjustOpinionWithTradersOpinions();
           });
 
@@ -130,42 +115,44 @@ public class FundamentalTrader extends Trader {
   public void adjustOpinionWithTradersOpinions() {
 
     double[] opinionsList = getMessageOfType(Messages.SocialNetworkOpinion.class).opinionList;
-
-//    System.out.println("Opinion before update: " + opinion);
-
     getDoubleAccumulator("opinions").add(opinion);
 
+//    int count = 0;
     for (double o : opinionsList) {
+      if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
 
-//        double confidenceFactor = 1 / (Math.abs(o - opinion) + 1);
+        opinion += (o - opinion) * getGlobals().gamma;
 
-      opinion += (o - opinion) * getGlobals().confidenceFactor;
+        /* dynamics confidence factor */
+        // it doesnt work well because the opinions considered are still close to the self opinion,
+        // so it converges super quickly
+//        double gamma = 1 / (Math.abs(o - opinion) + 1);
+//        double beta = 1 - gamma;
+        /* opinion = opinion * selfConfidence + otherOpinion * ConfidenceToOther */
+//        opinion = opinion * beta + o * gamma;
+      }
     }
-
-//    System.out.println(opinionsList.length + " opinions considered");
-//    System.out.println("Opinion after update: " + opinion);
+//    System.out.println(count + " opinions out of " + opinionsList.length + " opinions considered");
   }
 
-
+  /* take opinion from influencer */
   public void adjustOpinionWithInfluencerOpinion() {
 
-    /* take opinion from influencer */
-
     if (hasMessageOfType(InfluencerSocialNetworkOpinion.class)) {
-      double influencerOpinion =
-          getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
+      double influencerOpinion = getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
 
-      System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + influencerOpinion);
+//      System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + influencerOpinion);
 
-      double influencerEffect = getPrng().uniform(0, 1).sample();
+//      if (opinion > 0) {
+//        opinion += (influencerOpinion - opinion) * (getGlobals().gamma + 0.005);
+//      }
 
-      double confidenceFactor =
-          (1 / (Math.abs(influencerOpinion - opinion) + 1) + influencerEffect);
-
-      // upper-bound of confidence factor: 1
-      opinion += (influencerOpinion - opinion) * Math.min(1, confidenceFactor);
-//      System.out.println("opinion after Elon: " + opinion);
+      double confidenceFactor = (1 / (Math.abs(influencerOpinion - opinion) + 10));
+      opinion += (influencerOpinion - opinion) * confidenceFactor;
+      System.out.println("opinion after Elon: " + opinion);
     }
 
   }
+
 }
+

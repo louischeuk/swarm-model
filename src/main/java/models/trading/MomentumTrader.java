@@ -38,6 +38,14 @@ package models.trading;
 
 public class MomentumTrader extends Trader {
 
+  int shortTermMALookBackPeriod = 7;
+
+  int longTermMALookBackPeriod = 21;
+
+
+
+
+
   @Override
   protected void tradeStrategy() {
 

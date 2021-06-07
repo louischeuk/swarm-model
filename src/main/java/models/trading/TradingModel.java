@@ -1,7 +1,5 @@
 package models.trading;
 
-import java.util.ArrayList;
-import java.util.List;
 import models.trading.Trader.Type;
 import simudyne.core.abm.AgentBasedModel;
 import simudyne.core.abm.GlobalState;
@@ -16,7 +14,7 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 3;
+  public int numTrader = 10;
 
   @Input(name = "Proportion of FT traders")
   public double proportionFTTraders = 100;
@@ -36,7 +34,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     @Input(name = "Exchange's lambda")
     public double lambda = 0.3;
 
-    @Input(name = "Standard deviation") // for real value
+    @Input(name = "Standard deviation") /* for market true value */
     public double stdDev = 5;
 
     @Input(name = "Short selling duration")
@@ -60,10 +58,12 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     @Input(name = "Maintenance Margin")
     public double maintenanceMargin = 0.3;
 
-    public List<Double> priceHistory = new ArrayList<>(); /* store the price */
+    /* smaller the value, more clusters formed */
+    @Input(name = "vicinity Range")
+    public double vicinityRange = 2; /* upon 1.5, all opinions converged */
 
-    @Input(name = "Confidence Factor")
-    public double confidenceFactor = 0.5; /* speed of convergence of opinions */
+    @Input(name = "Trust to average of other opinions")
+    public double gamma = 0.001; /* speed of convergence of opinions */
 
   }
 
@@ -73,10 +73,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void init() {
     createLongAccumulator("buys", "Number of buy orders");
     createLongAccumulator("sells", "Number of sell orders");
-    createLongAccumulator("shorts", "Number of short sell orders");           // inclusive
-    createLongAccumulator("coverShorts", "Number of short position covered"); // inclusive
+    createLongAccumulator("shorts", "Number of short sell orders");           /* inclusive */
+    createLongAccumulator("coverShorts", "Number of short position covered"); /* inclusive */
     createDoubleAccumulator("price", "Market price");
     createDoubleAccumulator("opinions", "Opinions");
+    createDoubleAccumulator("marketTrueValue", "Market True Value");
 
 
     registerAgentTypes(
@@ -107,8 +108,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
           t.type = Type.Fundamental;
           t.opinion = t.getPrng().normal(0, 1).sample();
           t.zScore = t.opinion;
-
-          t.intrinsicNoOpinionDynamics = t.intrinsicValue;
+          t.intrinsicNoOpnDynamics = t.intrinsicValue;
 
           System.out.println("Trader type: " + t.type);
 
@@ -136,12 +136,12 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     Group<SocialNetwork> socialMediaGroup = generateGroup(SocialNetwork.class, 1);
 
-//    Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
-//        b -> {
-//          b.followers = numFundamentalTrader;
-//          b.opinion = 1.0;
-//          b.probabilityToShare = 0.6;
-//        });
+    Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
+        b -> {
+          b.followers = numFundamentalTrader;
+          b.opinion = 10; /* try 100 to have a nice uptrend of market price */
+          b.probabilityToShare = 1;
+        });
 
     /* ---------------------- connections ---------------------- */
 
@@ -154,7 +154,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     fundamentalTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
     socialMediaGroup.fullyConnected(fundamentalTraderGroup, Links.SocialNetworkLink.class);
 
-//    influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+    influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
 
     super.setup();
 

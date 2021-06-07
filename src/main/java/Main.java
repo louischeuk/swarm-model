@@ -6,6 +6,4 @@ public class Main {
     Server.register("Swarm", TradingModel.class);
     Server.run();
   }
-
-
 }

@@ -7,11 +7,11 @@ import simudyne.core.functions.SerializableConsumer;
 /* eg. Elon Musk */
 public class Influencer extends Agent<TradingModel.Globals> {
 
-  public int followers;
+  int followers;
 
-  public double opinion; /* extremest: -1.0 or 1.0 */
+  double opinion; /* extremest. be high to have a nice uptrend curve of market price */
 
-  public double probabilityToShare;
+  double probabilityToShare;
 
   private static Action<Influencer> action(SerializableConsumer<Influencer> consumer) {
     return Action.create(Influencer.class, consumer);
@@ -23,10 +23,10 @@ public class Influencer extends Agent<TradingModel.Globals> {
             if (i.getPrng().uniform(0, 1).sample() < i.probabilityToShare) {
               i.getLinks(Links.SocialNetworkLink.class)
                   .send(Messages.InfluencerOpinionShared.class, i.opinion);
-//              System.out.println("Elon Musk (ID: " + i.getID() + ") sent opinion");
+              System.out.println("Elon Musk (ID: " + i.getID() + ") sent opinion");
 
             } else {
-//              System.out.println("nope Elon Musk not posting");
+              System.out.println("nope Elon Musk not posting");
             }
           });
 

@@ -25,7 +25,7 @@ public class Market extends Agent<TradingModel.Globals> {
       action(
           m -> {
 
-            m.getGlobals().priceHistory.add(m.price);
+            m.getDoubleAccumulator("marketTrueValue").add(m.getGlobals().trueValue);
 
             // get total amount of buys and sells shares for all agents
             double buys = m.getMessagesOfType(Messages.BuyOrderPlaced.class).stream()

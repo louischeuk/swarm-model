@@ -15,13 +15,12 @@ public class FundamentalTrader extends Trader {
   @Variable
   public double intrinsicNoOpnDynamics;
 
-
   @Variable
   public double opinion; /*
                            opinion = zScore
                                    = N(0, 1) for v_i(t) = opinion * sd + V(t)
                            intention: to fixed the direction of intrinsic
-                           will adjust with the opinion
+                           will adjust with other opinions
                         */
 
   @Variable

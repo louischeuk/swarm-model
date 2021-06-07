@@ -1,5 +1,6 @@
 package models.trading;
 
+import java.util.HashMap;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -10,12 +11,12 @@ public class Market extends Agent<TradingModel.Globals> {
 
   @Variable
   public double price;
-
   int numTraders;
+  long tick = 0;
 
-  int timeStep = 0;
+//  int marketShockStep = 50;
 
-  int marketShockStep = 50;
+  HashMap<Long, java.lang.Double> historicalPrices = new HashMap<Long, java.lang.Double>();
 
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);
@@ -67,21 +68,21 @@ public class Market extends Agent<TradingModel.Globals> {
 
               m.getDoubleAccumulator("price").add(m.getGlobals().marketPrice);
               m.getLinks(Links.TradeLink.class)
-                  .send(Messages.MarketPrice.class, m.getGlobals().marketPrice);
+                  .send(Messages.MarketPrice.class, m.price);
             }
 
             // check if marketShock is triggered
-            if (++m.timeStep == m.marketShockStep) {
-//              m.triggerMarketShock();
-            }
-            System.out.println("Time step: " + m.timeStep + "\n");
+//            if (++m.tick == m.marketShockStep) {
+////              m.triggerMarketShock();
+//            }
+            System.out.println("Time step: " + m.tick + "\n");
           });
 
-  private void triggerMarketShock() {
-    getGlobals().trueValue = 150; // hard care when testing
-    getLinks(Links.TradeLink.class).send(Messages.MarketShock.class, marketShockStep);
-
-  }
+//  private void triggerMarketShock() {
+//    getGlobals().trueValue = 150; // hard care when testing
+//    getLinks(Links.TradeLink.class).send(Messages.MarketShock.class, marketShockStep);
+//
+//  }
 
   /* update true value V(t) - random walk: */
   public static Action<Market> updateTrueValue =

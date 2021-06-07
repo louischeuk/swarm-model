@@ -36,14 +36,25 @@ package models.trading;
       M = (15/10) x 100 = 150
    */
 
+import simudyne.core.abm.Action;
+import simudyne.core.annotations.Variable;
+import simudyne.core.functions.SerializableConsumer;
+
 public class MomentumTrader extends Trader {
 
   int shortTermMALookBackPeriod = 7;
-
   int longTermMALookBackPeriod = 21;
 
+  @Variable
+  public double shortTermMA;
+
+  @Variable
+  public double longTermMA;
 
 
+  private static Action<MomentumTrader> action(SerializableConsumer<MomentumTrader> consumer) {
+    return Action.create(MomentumTrader.class, consumer);
+  }
 
 
   @Override

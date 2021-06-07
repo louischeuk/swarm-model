@@ -8,9 +8,7 @@ import simudyne.core.functions.SerializableConsumer;
 public class Influencer extends Agent<TradingModel.Globals> {
 
   int followers;
-
   double opinion; /* extremest. be high to have a nice uptrend curve of market price */
-
   double probabilityToShare;
 
   private static Action<Influencer> action(SerializableConsumer<Influencer> consumer) {

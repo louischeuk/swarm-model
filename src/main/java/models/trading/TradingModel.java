@@ -14,7 +14,7 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of Traders")
-  public int numTrader = 10;
+  public int numTrader = 100;
 
   @Input(name = "Proportion of FT traders")
   public double proportionFTTraders = 100;
@@ -64,6 +64,10 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     @Input(name = "Trust to average of other opinions")
     public double gamma = 0.001; /* speed of convergence of opinions */
+
+    /* 0-1, larger number means a higher probability to trade in step */
+    @Input(name = "Momentum trader activity")
+    public double momentumTraderActivity = 1;
 
   }
 
@@ -139,7 +143,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
         b -> {
           b.followers = numFundamentalTrader;
-          b.opinion = 10; /* try 100 to have a nice uptrend of market price */
+          b.opinion = 5; /* try 100 to have a nice uptrend of market price */
           b.probabilityToShare = 1;
         });
 

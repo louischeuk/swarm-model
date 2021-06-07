@@ -1,5 +1,6 @@
 package models.trading;
 
+import models.trading.Links.SocialNetworkLink;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.functions.SerializableConsumer;
@@ -18,8 +19,9 @@ public class Influencer extends Agent<TradingModel.Globals> {
   public static Action<Influencer> shareOpinion =
       action(
           i -> {
+
             if (i.getPrng().uniform(0, 1).sample() < i.probabilityToShare) {
-              i.getLinks(Links.SocialNetworkLink.class)
+              i.getLinks(SocialNetworkLink.class)
                   .send(Messages.InfluencerOpinionShared.class, i.opinion);
               System.out.println("Elon Musk (ID: " + i.getID() + ") sent opinion");
 

@@ -11,22 +11,31 @@ public class Market extends Agent<TradingModel.Globals> {
 
   @Variable
   public double price;
+
+  @Variable
+  public double trueValue;
+
   int numTraders;
   long tick = 0;
-
 //  int marketShockStep = 50;
 
-  HashMap<Long, java.lang.Double> historicalPrices = new HashMap<Long, java.lang.Double>();
+  HashMap<Long, Double> historicalPrices = new HashMap<Long, Double>();
+
+  /* --------- function definitions --------- */
 
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);
   }
 
+  public static Action<Market> sendPriceToTraders =
+      action(m -> m.getLinks(Links.TradeLink.class)
+          .send(Messages.MarketPrice.class, m.price));
+
+
+
   public static Action<Market> calcPriceImpact =
       action(
           m -> {
-
-            m.getDoubleAccumulator("marketTrueValue").add(m.getGlobals().trueValue);
 
             // get total amount of buys and sells shares for all agents
             double buys = m.getMessagesOfType(Messages.BuyOrderPlaced.class).stream()
@@ -47,29 +56,27 @@ public class Market extends Agent<TradingModel.Globals> {
             double netDemand = buys - sells;
             System.out.println("Net demand: " + netDemand);
 
-            if (netDemand == 0) {
-              m.getLinks(Links.TradeLink.class)
-                  .send(Messages.MarketPrice.class, m.getGlobals().marketPrice);
-              m.getDoubleAccumulator("price").add(m.getGlobals().marketPrice);
-
-            } else {
+            if (netDemand != 0) {
               double lambda = m.getGlobals().lambda;
               double priceChange = netDemand * lambda;
 
               System.out.println("Price change: " + priceChange);
 
-              m.getGlobals().marketPrice += priceChange;
+              m.price += priceChange;
 
-              if (m.getGlobals().marketPrice < 0) {
-                m.getGlobals().marketPrice = 0;
+              if (m.price < 0) {
+                m.price = 0;
               }
 
-              m.price = m.getGlobals().marketPrice; // to see in console
-
-              m.getDoubleAccumulator("price").add(m.getGlobals().marketPrice);
-              m.getLinks(Links.TradeLink.class)
-                  .send(Messages.MarketPrice.class, m.price);
+              m.price = m.price; // to see in console
             }
+
+//            m.getLinks(Links.TradeLink.class)
+//                .send(Messages.MarketPrice.class, m.getGlobals().marketPrice);
+            m.getDoubleAccumulator("price").add(m.price);
+
+//            m.getLinks(Links.TradeLink.class)
+//                .send(Messages.TrueValue.class, m.trueValue);
 
             // check if marketShock is triggered
 //            if (++m.tick == m.marketShockStep) {
@@ -98,22 +105,24 @@ public class Market extends Agent<TradingModel.Globals> {
 
         System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
 
-        System.out.println("prev True value: " + m.getGlobals().trueValue);
+        System.out.println("prev True value: " + m.trueValue);
 
         /*
            V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process
                 = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i)
         */
-        m.getGlobals().trueValue =
-            m.getGlobals().trueValue
+        m.trueValue =
+            m.trueValue
             + m.getPrng().normal(0, m.getGlobals().stdDev).sample()
             + jumpDiffusionProcess;
 
-        if (m.getGlobals().trueValue < 0) {
-          m.getGlobals().trueValue = 0;
+        if (m.trueValue < 0) {
+          m.trueValue = 0;
         }
 
-        System.out.println("New True value: " + m.getGlobals().trueValue);
+        System.out.println("New True value: " + m.trueValue);
+
+        m.getLinks(Links.TradeLink.class).send(Messages.TrueValue.class, m.trueValue);
       });
 
 

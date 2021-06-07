@@ -74,7 +74,8 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   protected void handleWhenBuyShares(int sharesToBuy) {
-    if (hasEnoughWealth(getGlobals().marketPrice * sharesToBuy)) {
+
+    if (hasEnoughWealth(getMarketPrice() * sharesToBuy)) {
       buy(sharesToBuy);
 
       if (shares < 0) {
@@ -86,6 +87,10 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
       }
 
     }
+  }
+
+  protected double getMarketPrice() {
+    return getMessageOfType(Messages.MarketPrice.class).getBody();
   }
 
   protected void handleWhenSellShares(int sharesToSell) {
@@ -111,7 +116,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   private void initiateMarginAccount(double sharesToShort) {
     marginAccount =
-        (sharesToShort * getGlobals().marketPrice) * (1 + getGlobals().initialMarginRequirement);
+        (sharesToShort * getMarketPrice()) * (1 + getGlobals().initialMarginRequirement);
 
 //    System.out.println("Margin account: " + marginAccount);
   }
@@ -128,13 +133,13 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     // example: with 10K investment, you need 5K cash at start
     if (shares == 0) {
       return wealth
-          >= (sharesToSell * getGlobals().marketPrice * getGlobals().initialMarginRequirement);
+          >= (sharesToSell * getMarketPrice() * getGlobals().initialMarginRequirement);
     }
 
     // share < 0: (there are already some short positions)
     System.out.println("Hello short shares here is " + shares);
     return wealth >= (
-        (Math.abs(shares) + sharesToSell) * getGlobals().marketPrice
+        (Math.abs(shares) + sharesToSell) * getMarketPrice()
             * getGlobals().initialMarginRequirement);
 
   }
@@ -185,7 +190,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
 //    System.out.println("Previous wealth: " + wealth);
 
-    wealth -= getGlobals().marketPrice * amountToBuy;
+    wealth -= getMarketPrice() * amountToBuy;
     shares += amountToBuy;
 
 //    System.out.println("Current wealth: " + wealth);
@@ -193,7 +198,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   protected boolean hasEnoughWealthToMaintainMarginAccount() {
-    double totalValueOfShorts = Math.abs(shares) * getGlobals().marketPrice;
+    double totalValueOfShorts = Math.abs(shares) * getMarketPrice();
     double wealthRequiredInMarginAccount = marginAccount * getGlobals().maintenanceMargin;
 
     return wealth >= wealthRequiredInMarginAccount - (marginAccount - totalValueOfShorts)
@@ -201,7 +206,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   protected boolean isMarginCallTriggered() {
-    double totalValueOfShorts = Math.abs(shares) * getGlobals().marketPrice;
+    double totalValueOfShorts = Math.abs(shares) * getMarketPrice();
     return ((marginAccount - totalValueOfShorts) / totalValueOfShorts)
         < getGlobals().maintenanceMargin;
     // formula: if (Trader's money / value of all short position) x 100% < maintenance margin,
@@ -234,7 +239,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   protected void updateMarginAccount(double sharesToShort) {
     marginAccount =
-        sharesToShort * getGlobals().marketPrice * (1 + getGlobals().initialMarginRequirement);
+        sharesToShort * getMarketPrice() * (1 + getGlobals().initialMarginRequirement);
 
 //    System.out.println("~~~~~~Margin account updated: " + marginAccount);
   }
@@ -246,7 +251,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
 //    System.out.println("Previous wealth: " + wealth);
 
-    wealth += getGlobals().marketPrice * sharesToSell;
+    wealth += getMarketPrice() * sharesToSell;
     shares -= sharesToSell;
 
 //    System.out.println("Current wealth: " + wealth);

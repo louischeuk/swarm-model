@@ -16,19 +16,25 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   @Constant(name = "Number of Traders")
   public int numTrader = 100;
 
-  @Input(name = "Proportion of FT traders")
-  public double proportionFTTraders = 100;
+  @Constant(name = "Proportion of FT traders")
+  public double proportionFTTrader = 100;
 
-  @Input(name = "Proportion of Noise traders")
-  public double proportionNoiseTraders = 0;
+  @Constant(name = "Proportion of Noise traders")
+  public double proportionNoiseTrader = 0;
+
+  @Input(name = "Market price")
+  public double marketPrice = 80.0;
+
+  @Input(name = "Market Real value/equilibrium")
+  public double trueValue = 100;
 
   public static final class Globals extends GlobalState {
 
-    @Input(name = "Market price")
-    public double marketPrice = 80.0;
+//    @Input(name = "Market price")
+//    public double marketPrice = 80.0;
 
-    @Input(name = "Real value of market price")
-    public double trueValue = 100.0;
+//    @Input(name = "Real value of market price")
+//    public double trueValue = 100.0;
 
     /* aka price elasticity. speed at which the market price converges market equilibrium */
     @Input(name = "Exchange's lambda")
@@ -69,6 +75,10 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     @Input(name = "Momentum trader activity")
     public double momentumTraderActivity = 1;
 
+    /* 0-1, larger number means a higher probability to trade in step */
+    @Input(name = "Noise trader activity")
+    public double noiseTraderActivity = 1;
+
   }
 
 
@@ -81,8 +91,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createLongAccumulator("coverShorts", "Number of short position covered"); /* inclusive */
     createDoubleAccumulator("price", "Market price");
     createDoubleAccumulator("opinions", "Opinions");
-    createDoubleAccumulator("marketTrueValue", "Market True Value");
-
 
     registerAgentTypes(
         Market.class,
@@ -96,20 +104,27 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void setup() {
 
     /* proportion of traders */
-    int numFundamentalTrader = (int) (numTrader * (proportionFTTraders / 100));
-    int numNoiseTrader = (int) (numTrader * (proportionNoiseTraders / 100));
+    int numFundamentalTrader = (int) (numTrader * (proportionFTTrader / 100));
+    int numNoiseTrader = (int) (numTrader * (proportionNoiseTrader / 100));
 
     /* ---------------------- Groups creation ---------------------- */
+
+    Group<Market> marketGroup = generateGroup(Market.class, 1,
+        market -> {
+          market.numTraders = numTrader;
+          market.price = marketPrice;
+          market.trueValue = trueValue;
+        });
 
     Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
         numFundamentalTrader, t -> {
 
-          t.intrinsicValue = t.getPrng().normal(getGlobals().trueValue, getGlobals().stdDev)
+          t.type = Type.Fundamental;
+          t.intrinsicValue = t.getPrng().normal(trueValue, getGlobals().stdDev)
               .sample();
           t.wealth = t.getPrng().exponential(100000000).sample();
 //      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
           t.shortDuration = t.getGlobals().shortSellDuration;
-          t.type = Type.Fundamental;
           t.opinion = t.getPrng().normal(0, 1).sample();
           t.zScore = t.opinion;
           t.intrinsicNoOpnDynamics = t.intrinsicValue;
@@ -132,19 +147,16 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 //      System.out.println("Trader type: " + t.type);
 //    });
 
-    Group<Market> marketGroup = generateGroup(Market.class, 1,
-        market -> {
-          market.numTraders = numTrader;
-          market.price = getGlobals().marketPrice;
-        });
 
     Group<SocialNetwork> socialMediaGroup = generateGroup(SocialNetwork.class, 1);
 
     Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
-        b -> {
-          b.followers = numFundamentalTrader;
-          b.opinion = 5; /* try 100 to have a nice uptrend of market price */
-          b.probabilityToShare = 1;
+        i -> {
+          i.followers = numFundamentalTrader;
+          i.opinion = 5; /* try 100 to have a nice uptrend of market price */
+          i.probabilityToShare = 1;
+
+          System.out.println("elon created");
         });
 
     /* ---------------------- connections ---------------------- */
@@ -168,21 +180,48 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void step() {
     super.step();
 
+//    run(
+//        Split.create(
+//            Trader.processMarketPrice,
+//            FundamentalTrader.shareOpinion,
+//            Influencer.shareOpinion
+//        ),
+//        Sequence.create(
+//        Split.create(
+//            Market.calcPriceImpact,
+//            Sequence.create(
+//                SocialNetwork.publishOpinions,
+//                FundamentalTrader.fetchAndAdjustOpinion
+//            ),
+//            Market.updateTrueValue
+//        ),
+//        FundamentalTrader.adjustIntrinsicValue // doesnt work!
+//    ));
+
+
     run(
-        Split.create(
-            Trader.processMarketPrice,
-            FundamentalTrader.shareOpinion,
-            Influencer.shareOpinion
-        ),
-        Split.create(
-            Market.calcPriceImpact,
-            Sequence.create(
-                SocialNetwork.publishOpinions,
-                FundamentalTrader.fetchAndAdjustOpinion
+        Sequence.create(
+
+            Split.create(
+                Sequence.create(
+                    Market.sendPriceToTraders,
+                    Trader.processMarketPrice,
+                    Split.create(
+                        Market.calcPriceImpact,
+                        Market.updateTrueValue
+                    )
+                ),
+                Sequence.create(
+                    Split.create(
+                        FundamentalTrader.shareOpinion,
+                        Influencer.shareOpinion
+                    ),
+                    SocialNetwork.publishOpinions,
+                    FundamentalTrader.fetchAndAdjustOpinion
+                )
             ),
-            Market.updateTrueValue
-        ),
-        FundamentalTrader.adjustIntrinsicValue
+            FundamentalTrader.adjustIntrinsicValue
+        )
     );
 
   }

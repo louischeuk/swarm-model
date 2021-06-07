@@ -29,4 +29,5 @@ public class Messages {
     HashMap<java.lang.Long, java.lang.Double> historicalPrices;
   }
 
+  public static class TrueValue extends Message.Double {}
 }

@@ -16,10 +16,10 @@ public class Market extends Agent<TradingModel.Globals> {
   public double trueValue;
 
   int numTraders;
-  long tick = 0;
+  long tick = 0L;
 //  int marketShockStep = 50;
 
-  HashMap<Long, Double> historicalPrices = new HashMap<Long, Double>();
+  HashMap<Long, java.lang.Double> historicalPrices;
 
   /* --------- function definitions --------- */
 
@@ -28,9 +28,10 @@ public class Market extends Agent<TradingModel.Globals> {
   }
 
   public static Action<Market> sendPriceToTraders =
-      action(m -> m.getLinks(Links.TradeLink.class)
-          .send(Messages.MarketPrice.class, m.price));
-
+      action(m -> {
+        m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
+        m.getLinks(Links.TradeLink.class).send(Messages.Tick.class, m.tick);
+      });
 
 
   public static Action<Market> calcPriceImpact =
@@ -59,30 +60,27 @@ public class Market extends Agent<TradingModel.Globals> {
             if (netDemand != 0) {
               double lambda = m.getGlobals().lambda;
               double priceChange = netDemand * lambda;
-
               System.out.println("Price change: " + priceChange);
 
               m.price += priceChange;
-
-              if (m.price < 0) {
-                m.price = 0;
-              }
-
-              m.price = m.price; // to see in console
+              m.price = m.price < 0 ? 0 : m.price;
             }
 
-//            m.getLinks(Links.TradeLink.class)
-//                .send(Messages.MarketPrice.class, m.getGlobals().marketPrice);
             m.getDoubleAccumulator("price").add(m.price);
-
-//            m.getLinks(Links.TradeLink.class)
-//                .send(Messages.TrueValue.class, m.trueValue);
 
             // check if marketShock is triggered
 //            if (++m.tick == m.marketShockStep) {
 ////              m.triggerMarketShock();
 //            }
-            System.out.println("Time step: " + m.tick + "\n");
+
+            System.out.println("Time step: " + ++m.tick + "\n");
+
+            m.historicalPrices.put(m.tick, m.price);
+            m.getLinks(Links.TradeLink.class).send(Messages.HistoricalPrices.class,
+              (a, t) -> a.historicalPrices = m.historicalPrices);
+            m.getLinks(Links.TradeLink.class).send(Messages.Tick.class, m.tick);
+            m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
+
           });
 
 //  private void triggerMarketShock() {
@@ -111,15 +109,11 @@ public class Market extends Agent<TradingModel.Globals> {
            V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process
                 = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i)
         */
-        m.trueValue =
-            m.trueValue
+        m.trueValue = m.trueValue
             + m.getPrng().normal(0, m.getGlobals().stdDev).sample()
             + jumpDiffusionProcess;
 
-        if (m.trueValue < 0) {
-          m.trueValue = 0;
-        }
-
+        m.trueValue = m.trueValue < 0 ? 0 : m.trueValue;
         System.out.println("New True value: " + m.trueValue);
 
         m.getLinks(Links.TradeLink.class).send(Messages.TrueValue.class, m.trueValue);

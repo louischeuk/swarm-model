@@ -84,7 +84,7 @@ public class FundamentalTrader extends Trader {
             double trueValue = 0;
             if (t.hasMessageOfType(Messages.TrueValue.class)) {
               trueValue = t.getMessageOfType(Messages.TrueValue.class).getBody();
-              System.out.println("get a true value");
+//              System.out.println("get a true value");
             }
 
 //            System.out.println("Trader " + t.getID() + " prev intrinsic value: " + t.intrinsicValue);
@@ -159,7 +159,7 @@ public class FundamentalTrader extends Trader {
 //        opinion += (influencerOpinion - opinion) * (getGlobals().gamma + 0.005);
 //      }
 
-      double confidenceFactor = (1 / (Math.abs(influencerOpinion - opinion) + 10));
+      double confidenceFactor = (1 / (Math.abs(influencerOpinion - opinion) + getGlobals().k));
       opinion += (influencerOpinion - opinion) * confidenceFactor;
 //      System.out.println("opinion after Elon: " + opinion);
     }

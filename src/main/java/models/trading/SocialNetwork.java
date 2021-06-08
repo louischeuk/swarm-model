@@ -43,7 +43,7 @@ public class SocialNetwork extends Agent<TradingModel.Globals> {
         "Social media platform received " + opinionsList.length + " opinion");
 
     getLinks(SocialNetworkLink.class)
-        .send(Messages.SocialNetworkOpinion.class, (m, l) -> m.opinionList = opinionsList);
+        .send(Messages.SocialNetworkOpinion.class, (s, t) -> s.opinionList = opinionsList);
 
   }
 

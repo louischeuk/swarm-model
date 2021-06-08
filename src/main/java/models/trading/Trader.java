@@ -27,6 +27,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   public double wealth;
 
+  @Variable
   public double shares = 0;
 
   public int timeSinceShort = -1;

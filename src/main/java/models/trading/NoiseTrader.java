@@ -1,19 +1,6 @@
 package models.trading;
 
-/*
-  Noise trader (uninformed): - will randomly buy or sell
-                                - only contribute to nose
-
-  They cause the market to artificially react to their trades and can
-  send prices and stock movements surging in one direction or another,
-  even if all other traders act in a rational way.
-
-  Noise traders are usually linked to high volume trading days.
-  They typically end up overinflating securities during bullish periods
-  and excessively deflating them during bearish periods.
-  In most cases, noise traders are investors without a professional background in trading.
-*/
-
+/* Noise trader (uninformed): Randomly buy or sell. Only contribute to noise */
 public class NoiseTrader extends Trader {
 
   @Override
@@ -22,7 +9,7 @@ public class NoiseTrader extends Trader {
     System.out.println("Trader id: " + getID());
     System.out.println("^^^^^^^^^ noise trader strategy ^^^^^^^^^");
 
-      // volume = N(0, 10)
+      // volume = N(0, sigma)
       int volume = (int) getPrng().normal(0, getGlobals().stdDev).sample();
       System.out.println("Volume: " + volume);
 

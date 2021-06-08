@@ -25,9 +25,11 @@ public class Messages {
 
   public static class InfluencerSocialNetworkOpinion extends Message.Double {}
 
-  public static class historicalPriceToMomentum extends Message {
+  public static class TrueValue extends Message.Double {}
+
+  public static class HistoricalPrices extends Message {
     HashMap<java.lang.Long, java.lang.Double> historicalPrices;
   }
 
-  public static class TrueValue extends Message.Double {}
+  public static class Tick extends Message.Long {}
 }

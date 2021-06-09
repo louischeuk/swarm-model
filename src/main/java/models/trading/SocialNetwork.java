@@ -23,8 +23,7 @@ public class SocialNetwork extends Agent<TradingModel.Globals> {
   private void publishInfluencerOpinion() {
     // handle opinions from influencer agent
     if (hasMessagesOfType(Messages.InfluencerOpinionShared.class)) {
-      double influencerOpinion =
-          getMessageOfType(Messages.InfluencerOpinionShared.class).getBody();
+      double influencerOpinion = getMessageOfType(Messages.InfluencerOpinionShared.class).getBody();
 
       System.out.println(
           "Social media platform received Elon Musk's " + influencerOpinion + " opinion");

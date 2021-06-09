@@ -73,9 +73,10 @@ public class Market extends Agent<TradingModel.Globals> {
 ////              m.triggerMarketShock();
 //            }
 
-            System.out.println("Time step: " + ++m.tick + "\n");
+            /* for momentum traders to update the moving averages */
+            m.historicalPrices.put(++m.tick, m.price);
+            System.out.println("Time step: " + m.tick + "\n");
 
-            m.historicalPrices.put(m.tick, m.price);
             m.getLinks(Links.TradeLink.class).send(Messages.HistoricalPrices.class,
               (a, t) -> a.historicalPrices = m.historicalPrices);
             m.getLinks(Links.TradeLink.class).send(Messages.Tick.class, m.tick);

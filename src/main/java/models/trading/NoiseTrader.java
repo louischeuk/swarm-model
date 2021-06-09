@@ -13,7 +13,7 @@ public class NoiseTrader extends Trader {
       int volume = (int) getPrng().normal(0, getGlobals().stdDev).sample();
       System.out.println("Volume: " + volume);
 
-      if (getPrng().uniform(0,1).sample() < getGlobals().noiseTraderActivity) {
+      if (getPrng().uniform(0,1).sample() < getGlobals().probabilityNoiseTrade) {
         if (volume > 0) {
           handleWhenBuyShares(volume);
         } else {

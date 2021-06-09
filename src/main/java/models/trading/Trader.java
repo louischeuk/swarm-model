@@ -3,6 +3,7 @@ package models.trading;
 import models.trading.Links.TradeLink;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
+import simudyne.core.annotations.Input;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
@@ -23,24 +24,28 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
    coordinated: Reddit WSB
    */
 
-  public Type type; // Trader type
+  Type type; /* Trader type */
 
   public double wealth;
 
   @Variable
   public double shares = 0;
 
-  public int timeSinceShort = -1;
+  int timeSinceShort = -1;
 
   // after this shortDuration, you must cover your short positions
-  public int shortDuration;
+  int shortDuration;
 
-  public double marginAccount = 0;
+  double marginAccount = 0;
 
-  public boolean isBroke = false;
+  boolean isBroke = false;
 
   // the total times of transaction of short selling at a moment cannot exceed a int
-  public int numShortingInProcess = 0;
+  int numShortingInProcess = 0;
+
+  static double initialMarginRequirement = 0.5;
+
+  static double maintenanceMargin = 0.3;
 
   /* ------------------- functions ------------------- */
 
@@ -117,7 +122,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   private void initiateMarginAccount(double sharesToShort) {
     marginAccount =
-        (sharesToShort * getMarketPrice()) * (1 + getGlobals().initialMarginRequirement);
+        (sharesToShort * getMarketPrice()) * (1 + initialMarginRequirement);
 
 //    System.out.println("Margin account: " + marginAccount);
   }
@@ -134,14 +139,13 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     // example: with 10K investment, you need 5K cash at start
     if (shares == 0) {
       return wealth
-          >= (sharesToSell * getMarketPrice() * getGlobals().initialMarginRequirement);
+          >= (sharesToSell * getMarketPrice() * initialMarginRequirement);
     }
 
     // share < 0: (there are already some short positions)
     System.out.println("Hello short shares here is " + shares);
     return wealth >= (
-        (Math.abs(shares) + sharesToSell) * getMarketPrice()
-            * getGlobals().initialMarginRequirement);
+        (Math.abs(shares) + sharesToSell) * getMarketPrice() * initialMarginRequirement);
 
   }
 
@@ -200,7 +204,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   protected boolean hasEnoughWealthToMaintainMarginAccount() {
     double totalValueOfShorts = Math.abs(shares) * getMarketPrice();
-    double wealthRequiredInMarginAccount = marginAccount * getGlobals().maintenanceMargin;
+    double wealthRequiredInMarginAccount = marginAccount * maintenanceMargin;
 
     return wealth >= wealthRequiredInMarginAccount - (marginAccount - totalValueOfShorts)
         && wealth >= wealthRequiredInMarginAccount; // just double check
@@ -208,8 +212,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   protected boolean isMarginCallTriggered() {
     double totalValueOfShorts = Math.abs(shares) * getMarketPrice();
-    return ((marginAccount - totalValueOfShorts) / totalValueOfShorts)
-        < getGlobals().maintenanceMargin;
+    return ((marginAccount - totalValueOfShorts) / totalValueOfShorts) < maintenanceMargin;
     // formula: if (Trader's money / value of all short position) x 100% < maintenance margin,
     // then margin call is triggered
 
@@ -240,7 +243,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   protected void updateMarginAccount(double sharesToShort) {
     marginAccount =
-        sharesToShort * getMarketPrice() * (1 + getGlobals().initialMarginRequirement);
+        sharesToShort * getMarketPrice() * (1 + initialMarginRequirement);
 
 //    System.out.println("~~~~~~Margin account updated: " + marginAccount);
   }

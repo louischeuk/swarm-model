@@ -8,9 +8,14 @@ import simudyne.core.functions.SerializableConsumer;
 
 public class MomentumTrader extends Trader {
 
-  long shortTermMALookBackPeriod = 7;
-  long longTermMALookBackPeriod = 21;
-  int crossover = 0; /* 1: upward, 0: no change, -1: downward */
+  static long shortTermMALookBackPeriod = 7;
+  static long longTermMALookBackPeriod = 21;
+  static double smoothing = 2;
+  int crossoverDirection = 0; /*
+                                  1: upward (from below to above) - buy
+                                  0: hold
+                                  -1: downward (from above to below) - sell
+                              */
 
   @Variable
   public double shortTermSMA;
@@ -23,6 +28,8 @@ public class MomentumTrader extends Trader {
 
   @Variable
   public double longTermEMA;
+
+
 
   private static Action<MomentumTrader> action(SerializableConsumer<MomentumTrader> consumer) {
     return Action.create(MomentumTrader.class, consumer);
@@ -37,12 +44,12 @@ public class MomentumTrader extends Trader {
     System.out.println("tick: " + tick);
 
     if (tick > longTermMALookBackPeriod) {
-      if (getPrng().uniform(0, 1).sample() < getGlobals().momentumTraderActivity) {
+      if (getPrng().uniform(0, 1).sample() < getGlobals().probabilityMomentumTrade) {
 
         int volume = (int) getPrng().normal(0, getGlobals().stdDev).sample();
         System.out.println("Volume: " + volume);
 
-        switch (crossover) {
+        switch (crossoverDirection) {
           case 1:
             System.out.println("Time to buy");
             handleWhenBuyShares(volume);
@@ -98,7 +105,7 @@ public class MomentumTrader extends Trader {
   private double getEMA(long lookBackPeriod, double yesterdayEMA, long tick) {
 
     double closingPrice = getMessageOfType(Messages.MarketPrice.class).getBody();
-    double multiplier = getGlobals().smoothing / (1 + lookBackPeriod);
+    double multiplier = smoothing / (1 + lookBackPeriod);
 
     /* EMA = Closing price x multiplier + EMA (previous day) x (1-multiplier) */
     return closingPrice * multiplier + yesterdayEMA * (1 - multiplier);
@@ -109,7 +116,7 @@ public class MomentumTrader extends Trader {
         long tick = t.getMessageOfType(Messages.Tick.class).getBody();
         System.out.println("tick at momentum trader calMA action: " + tick);
 
-        if (tick == t.longTermMALookBackPeriod) { // first SMA / EMA
+        if (tick == longTermMALookBackPeriod) { // first SMA / EMA
           System.out.println("get first SMA and LMA at tick " + tick);
           t.shortTermSMA = t.getShortTermSMA(tick);
           t.longTermSMA = t.getLongTermSMA(tick);
@@ -118,7 +125,7 @@ public class MomentumTrader extends Trader {
           t.longTermEMA = t.shortTermEMA;
         }
 
-        if (tick > t.longTermMALookBackPeriod) {
+        if (tick > longTermMALookBackPeriod) {
           double curShortTermSMA = t.getShortTermSMA(tick);
           double curTermTermSMA = t.getLongTermSMA(tick);
 //
@@ -146,11 +153,11 @@ public class MomentumTrader extends Trader {
           double curTermTermEMA = t.getLongTermEMA(tick);
 
           if (t.shortTermEMA < t.longTermEMA && curShortTermEMA >= curTermTermEMA) {
-            t.crossover = 1;
+            t.crossoverDirection = 1;
           } else if (t.shortTermEMA > t.longTermEMA && curShortTermEMA <= curTermTermEMA) {
-            t.crossover = -1;
+            t.crossoverDirection = -1;
           } else {
-            t.crossover = 0;
+            t.crossoverDirection = 0;
           }
 
           // cur moving averages becomes yesterday moving averages

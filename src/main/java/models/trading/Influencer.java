@@ -8,7 +8,6 @@ import simudyne.core.functions.SerializableConsumer;
 /* eg. Elon Musk */
 public class Influencer extends Agent<TradingModel.Globals> {
 
-  int followers;
   double opinion; /* extremest. be high to have a nice uptrend curve of market price */
   double probabilityToShare;
 

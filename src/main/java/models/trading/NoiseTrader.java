@@ -6,8 +6,8 @@ public class NoiseTrader extends Trader {
   @Override
   protected void tradeStrategy() {
 
-    System.out.println("Trader id: " + getID());
     System.out.println("^^^^^^^^^ noise trader strategy ^^^^^^^^^");
+    System.out.println("Trader id: " + getID());
 
       // volume = N(0, sigma)
       int volume = (int) getPrng().normal(0, getGlobals().stdDev).sample();

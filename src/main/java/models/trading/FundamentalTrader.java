@@ -37,15 +37,11 @@ public class FundamentalTrader extends Trader {
   @Override
   protected void tradeStrategy() {
 
-    System.out.println("Trader id: " + getID());
     System.out.println("-------------- fundamental trader strategy --------------");
+    System.out.println("Trader id: " + getID());
 
-
-    double price = 0;
-    if (hasMessageOfType(MarketPrice.class)) {
-      price = getMessageOfType(MarketPrice.class).getBody();
-      System.out.println("get a market price" + price);
-    }
+    double price = getMessageOfType(MarketPrice.class).getBody();
+    System.out.println("get a market price" + price);
 
     double priceDistortion = intrinsicValue - price;
 
@@ -77,15 +73,12 @@ public class FundamentalTrader extends Trader {
   public static Action<FundamentalTrader> adjustIntrinsicValue =
       action(
           t -> {
-            if (t.hasMessageOfType(Messages.MarketShock.class)) {
-              System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
-            }
 
-            double trueValue = 0;
-            if (t.hasMessageOfType(Messages.TrueValue.class)) {
-              trueValue = t.getMessageOfType(Messages.TrueValue.class).getBody();
-//              System.out.println("get a true value");
-            }
+//            if (t.hasMessageOfType(Messages.MarketShock.class)) {
+//              System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
+//            }
+
+            double trueValue = t.getMessageOfType(Messages.TrueValue.class).getBody();
 
 //            System.out.println("Trader " + t.getID() + " prev intrinsic value: " + t.intrinsicValue);
 

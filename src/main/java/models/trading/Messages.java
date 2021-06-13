@@ -15,7 +15,7 @@ public class Messages {
 
   public static class CoverShortPosOrderPlaced extends Message.Double {}
 
-  public static class MarketShock extends Message.Integer {}
+  public static class MarketShock extends Message.Integer {} // for test purpose
 
   public static class TraderOpinionShared extends Message.Double {}
 
@@ -26,8 +26,6 @@ public class Messages {
   public static class InfluencerSocialNetworkOpinion extends Message.Double {}
 
   public static class TrueValue extends Message.Double {}
-
-  public static class Tick extends Message.Long {}
 
   public static class HistoricalPrices extends Message {
     HashMap<java.lang.Long, java.lang.Double> historicalPrices;

@@ -28,10 +28,11 @@ public class Market extends Agent<TradingModel.Globals> {
   }
 
   public static Action<Market> sendPriceToTraders =
-      action(m -> {
-        m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
-        m.getLinks(Links.TradeLink.class).send(Messages.Tick.class, m.tick);
-      });
+      action(
+          m -> {
+            m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
+            MomentumTrader.tick = m.tick;
+          });
 
 
   public static Action<Market> calcPriceImpact =
@@ -70,7 +71,8 @@ public class Market extends Agent<TradingModel.Globals> {
 
             // check if marketShock is triggered
 //            if (++m.tick == m.marketShockStep) {
-////              m.triggerMarketShock();
+//                  m.getGlobals().trueValue = 150; // hard care when testing
+//                  m.getLinks(Links.TradeLink.class).send(Messages.MarketShock.class, marketShockStep);
 //            }
 
             /* for momentum traders to update the moving averages */
@@ -78,47 +80,39 @@ public class Market extends Agent<TradingModel.Globals> {
             System.out.println("Time step: " + m.tick + "\n");
 
             m.getLinks(Links.TradeLink.class).send(Messages.HistoricalPrices.class,
-              (a, t) -> a.historicalPrices = m.historicalPrices);
-            m.getLinks(Links.TradeLink.class).send(Messages.Tick.class, m.tick);
+                (a, t) -> a.historicalPrices = m.historicalPrices);
+            MomentumTrader.tick = m.tick;
             m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
 
           });
 
-//  private void triggerMarketShock() {
-//    getGlobals().trueValue = 150; // hard care when testing
-//    getLinks(Links.TradeLink.class).send(Messages.MarketShock.class, marketShockStep);
-//
-//  }
-
   /* update true value V(t) - random walk: */
   public static Action<Market> updateTrueValue =
-      action(m -> {
+      action(
+          m -> {
+            /*
+               sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j may be == s_v
+               sd_j = 1, lambda = 2
+            */
+            double jumpDiffusionProcess =
+                m.getPrng().normal(0, 3).sample()
+                    * m.getPrng().poisson(2).sample();
+            System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
 
-        /*
-           sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j may be == s_v
-           sd_j = 1, lambda = 2
-        */
-        double jumpDiffusionProcess =
-            m.getPrng().normal(0, 3).sample()
-                * m.getPrng().poisson(2).sample();
+            /*
+               V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process
+                    = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i)
+            */
+            System.out.println("prev True value: " + m.trueValue);
+            m.trueValue = m.trueValue
+                + m.getPrng().normal(0, m.getGlobals().stdDev).sample()
+                + jumpDiffusionProcess;
 
-        System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
+            m.trueValue = m.trueValue < 0 ? 0 : m.trueValue;
+            System.out.println("New True value: " + m.trueValue);
 
-        System.out.println("prev True value: " + m.trueValue);
-
-        /*
-           V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process
-                = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i)
-        */
-        m.trueValue = m.trueValue
-            + m.getPrng().normal(0, m.getGlobals().stdDev).sample()
-            + jumpDiffusionProcess;
-
-        m.trueValue = m.trueValue < 0 ? 0 : m.trueValue;
-        System.out.println("New True value: " + m.trueValue);
-
-        m.getLinks(Links.TradeLink.class).send(Messages.TrueValue.class, m.trueValue);
-      });
+            m.getLinks(Links.TradeLink.class).send(Messages.TrueValue.class, m.trueValue);
+          });
 
 
 }

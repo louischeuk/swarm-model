@@ -15,19 +15,19 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of FT Traders")
-  public int numFundamentalTrader = 8;
+  public int numFundamentalTrader = 80;
 
   @Constant(name = "Number of Momentum Traders")
-  public int numMomentumTrader = 1;
+  public int numMomentumTrader = 10;
 
   @Constant(name = "Number of Noise Traders")
-  public int numNoiseTrader = 1;
+  public int numNoiseTrader = 10;
 
   @Input(name = "Market price")
   public double marketPrice = 80.0;
 
-  @Input(name = "Market Real value/equilibrium")
-  public double trueValue = 100;
+  @Input(name = "Market True value") /* aka market equilibrium */
+  public double trueValue = 100.0;
 
 
   public static final class Globals extends GlobalState {

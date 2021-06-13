@@ -8,14 +8,11 @@ import simudyne.core.functions.SerializableConsumer;
 
 public class MomentumTrader extends Trader {
 
+  static long tick; /* equal to the global tick. just to avoid ticks being passed around */
   static long shortTermMALookBackPeriod = 7;
   static long longTermMALookBackPeriod = 21;
   static double smoothing = 2;
-  int crossoverDirection = 0; /*
-                                  1: upward (from below to above) - buy
-                                  0: hold
-                                  -1: downward (from above to below) - sell
-                              */
+  static int crossoverDirection = 0;   /* 1: upward(↗)(buy) | 0: hold | -1: downward(↘)(sell) */
 
   @Variable
   public double shortTermSMA;
@@ -29,24 +26,21 @@ public class MomentumTrader extends Trader {
   @Variable
   public double longTermEMA;
 
-
-
   private static Action<MomentumTrader> action(SerializableConsumer<MomentumTrader> consumer) {
     return Action.create(MomentumTrader.class, consumer);
   }
 
   @Override
   protected void tradeStrategy() {
-
     System.out.println("********* momentum trader strategy *********");
-
-    long tick = getMessageOfType(Messages.Tick.class).getBody(); // note. 1 tick behind here
+    System.out.println("Trader id: " + getID());
     System.out.println("tick: " + tick);
 
     if (tick > longTermMALookBackPeriod) {
+      System.out.println("can trade");
       if (getPrng().uniform(0, 1).sample() < getGlobals().probabilityMomentumTrade) {
 
-        int volume = (int) getPrng().normal(0, getGlobals().stdDev).sample();
+        int volume = (int) Math.abs(getPrng().normal(0, getGlobals().stdDev).sample());
         System.out.println("Volume: " + volume);
 
         switch (crossoverDirection) {
@@ -56,7 +50,7 @@ public class MomentumTrader extends Trader {
             break;
           case -1:
             System.out.println("Time to sell");
-            handleWhenSellShares(Math.abs(volume));
+            handleWhenSellShares(volume);
             break;
           case 0:
             System.out.println("momentum trader holds");
@@ -69,22 +63,22 @@ public class MomentumTrader extends Trader {
   }
 
   /* ----------- SMA --------------- */
-  private double getShortTermSMA(long tick) {
-    return getSMA(shortTermMALookBackPeriod, tick);
+  private double getShortTermSMA() {
+    return getSMA(shortTermMALookBackPeriod);
   }
 
-  private double getLongTermSMA(long tick) {
-    return getSMA(longTermMALookBackPeriod, tick);
+  private double getLongTermSMA() {
+    return getSMA(longTermMALookBackPeriod);
   }
 
-  private double getSMA(long lookBackPeriod, long tick) {
+  private double getSMA(long lookBackPeriod) {
 
     HashMap<Long, Double> historicalPrices = getMessageOfType(
         HistoricalPrices.class).historicalPrices;
 
     double SMA = 0;
     int count = 0;
-    for (long i = tick; i > tick - lookBackPeriod; i--) {
+    for (long i = MomentumTrader.tick; i > MomentumTrader.tick - lookBackPeriod; i--) {
       SMA += historicalPrices.get(i);
       count++;
     }
@@ -94,16 +88,15 @@ public class MomentumTrader extends Trader {
   }
 
   /* ----------- EMA --------------- */
-  private double getShortTermEMA(long tick) {
-    return getEMA(shortTermMALookBackPeriod, shortTermEMA, tick);
+  private double getShortTermEMA() {
+    return getEMA(shortTermMALookBackPeriod, shortTermEMA);
   }
 
-  private double getLongTermEMA(long tick) {
-    return getEMA(longTermMALookBackPeriod, longTermEMA, tick);
+  private double getLongTermEMA() {
+    return getEMA(longTermMALookBackPeriod, longTermEMA);
   }
 
-  private double getEMA(long lookBackPeriod, double yesterdayEMA, long tick) {
-
+  private double getEMA(long lookBackPeriod, double yesterdayEMA) {
     double closingPrice = getMessageOfType(Messages.MarketPrice.class).getBody();
     double multiplier = smoothing / (1 + lookBackPeriod);
 
@@ -113,30 +106,27 @@ public class MomentumTrader extends Trader {
 
   public static Action<MomentumTrader> calcMA =
       action(t -> {
-        long tick = t.getMessageOfType(Messages.Tick.class).getBody();
+
         System.out.println("tick at momentum trader calMA action: " + tick);
 
-        if (tick == longTermMALookBackPeriod) { // first SMA / EMA
+        if (MomentumTrader.tick == longTermMALookBackPeriod) { // first SMA / EMA
           System.out.println("get first SMA and LMA at tick " + tick);
-          t.shortTermSMA = t.getShortTermSMA(tick);
-          t.longTermSMA = t.getLongTermSMA(tick);
-
-          t.shortTermEMA = t.shortTermSMA;
-          t.longTermEMA = t.shortTermEMA;
+          t.shortTermEMA = t.shortTermSMA = t.getShortTermSMA();
+          t.longTermEMA = t.longTermSMA = t.getLongTermSMA();
         }
 
         if (tick > longTermMALookBackPeriod) {
-          double curShortTermSMA = t.getShortTermSMA(tick);
-          double curTermTermSMA = t.getLongTermSMA(tick);
+          double curShortTermSMA = t.getShortTermSMA();
+          double curLongTermSMA = t.getLongTermSMA();
 //
 ////          System.out.println("prev short-term SMA: " + t.shortTermSMA);
 ////          System.out.println("prev long-term SMA: " + t.longTermSMA);
 ////          System.out.println("cur short-term SMA: " + curShortTermSMA);
-////          System.out.println("cur long-term SMA: " + curTermTermSMA);
+////          System.out.println("cur long-term SMA: " + curLongTermSMA);
 //
-//          if (t.shortTermSMA < t.longTermSMA && curShortTermSMA >= curTermTermSMA) {
+//          if (t.shortTermSMA < t.longTermSMA && curShortTermSMA >= curLongTermSMA) {
 //            t.crossover = 1;
-//          } else if (t.shortTermSMA > t.longTermSMA && curShortTermSMA <= curTermTermSMA) {
+//          } else if (t.shortTermSMA > t.longTermSMA && curShortTermSMA <= curLongTermSMA) {
 //            t.crossover = -1;
 //          } else {
 //            t.crossover = 0;
@@ -144,25 +134,25 @@ public class MomentumTrader extends Trader {
 //
           // cur moving averages becomes yesterday moving averages
           t.shortTermSMA = curShortTermSMA;
-          t.longTermSMA = curTermTermSMA;
+          t.longTermSMA = curLongTermSMA;
 
-
+          /* --------------------------------------------------- */
 
           /* EMA version */
-          double curShortTermEMA = t.getShortTermEMA(tick);
-          double curTermTermEMA = t.getLongTermEMA(tick);
+          double curShortTermEMA = t.getShortTermEMA();
+          double curLongTermEMA = t.getLongTermEMA();
 
-          if (t.shortTermEMA < t.longTermEMA && curShortTermEMA >= curTermTermEMA) {
-            t.crossoverDirection = 1;
-          } else if (t.shortTermEMA > t.longTermEMA && curShortTermEMA <= curTermTermEMA) {
-            t.crossoverDirection = -1;
+          if (t.shortTermEMA < t.longTermEMA && curShortTermEMA >= curLongTermEMA) {
+            crossoverDirection = 1;
+          } else if (t.shortTermEMA > t.longTermEMA && curShortTermEMA <= curLongTermEMA) {
+            crossoverDirection = -1;
           } else {
-            t.crossoverDirection = 0;
+            crossoverDirection = 0;
           }
 
           // cur moving averages becomes yesterday moving averages
           t.shortTermEMA = curShortTermEMA;
-          t.longTermEMA = curTermTermEMA;
+          t.longTermEMA = curLongTermEMA;
 
         }
       });

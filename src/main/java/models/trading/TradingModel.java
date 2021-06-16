@@ -1,6 +1,5 @@
 package models.trading;
 
-import java.util.HashMap;
 import models.trading.Trader.Type;
 import simudyne.core.abm.AgentBasedModel;
 import simudyne.core.abm.GlobalState;
@@ -15,16 +14,16 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of FT Traders")
-  public int numFundamentalTrader = 80;
-
-  @Constant(name = "Number of Momentum Traders")
-  public int numMomentumTrader = 10;
+  public int numFundamentalTrader = 1;
 
   @Constant(name = "Number of Noise Traders")
-  public int numNoiseTrader = 10;
+  public int numNoiseTrader = 1;
+
+  @Constant(name = "Number of Momentum Traders")
+  public int numMomentumTrader = 1;
 
   @Input(name = "Market price")
-  public double marketPrice = 80.0;
+  public float marketPrice = 80.0F;
 
   @Input(name = "Market True value") /* aka market equilibrium */
   public double trueValue = 100.0;
@@ -73,7 +72,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double probabilityNoiseTrade = 1;
 
     @Input(name = "Opinion of influencer")
-    public double influencerOpinion = 10;
+    public double influencerOpinion = 5;
 
   }
 
@@ -107,8 +106,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
           m.numTraders = numTrader;
           m.price = marketPrice;
           m.trueValue = trueValue;
-          m.historicalPrices = new HashMap<>();
-          m.historicalPrices.put(0L, m.price);
         });
 
     Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
@@ -127,26 +124,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
           System.out.println("Trader type: " + t.type);
         });
 
-//        if (t.getID() < numTrader * 0.2) {
-//          t.type = Type.Coordinated;
-//          for (int i = 0; i < numTrader * 0.2; i++) { // group the WSB traders
-//            t.addLink(i, Links.CoordinatedLink.class);
-//          }
-
-    if (numMomentumTrader > 0) {
-      Group<MomentumTrader> momentumTraderGroup = generateGroup(MomentumTrader.class,
-          numMomentumTrader, t -> {
-            /* parent class variable */
-            t.type = Type.Momentum;
-            t.wealth = t.getPrng().exponential(100000000).sample();
-            t.shortDuration = t.getGlobals().shortSellDuration;
-            System.out.println("Trader type: " + t.type);
-          });
-
-      momentumTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
-      marketGroup.fullyConnected(momentumTraderGroup, Links.TradeLink.class);
-    }
-
     if (numNoiseTrader > 0) {
       Group<NoiseTrader> noiseTraderGroup = generateGroup(NoiseTrader.class, numNoiseTrader, t -> {
         t.wealth = t.getPrng().exponential(100000000).sample();
@@ -157,6 +134,24 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
       noiseTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
       marketGroup.fullyConnected(noiseTraderGroup, Links.TradeLink.class);
+    }
+
+    if (numMomentumTrader > 0) {
+      Group<MomentumTrader> momentumTraderGroup = generateGroup(MomentumTrader.class,
+          numNoiseTrader, t -> {
+            t.wealth = t.getPrng().exponential(100000000).sample();
+            t.shortDuration = t.getGlobals().shortSellDuration;
+
+            t.opinion = t.getPrng().normal(0, 1).sample();
+            t.type = Type.Momentum;
+            System.out.println("Trader type: " + t.type);
+          });
+
+      momentumTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
+      marketGroup.fullyConnected(momentumTraderGroup, Links.TradeLink.class);
+
+      momentumTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
+      marketGroup.fullyConnected(momentumTraderGroup, Links.TradeLink.class);
     }
 
     Group<SocialNetwork> socialMediaGroup = generateGroup(SocialNetwork.class, 1);
@@ -173,8 +168,8 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     fundamentalTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
     marketGroup.fullyConnected(fundamentalTraderGroup, Links.TradeLink.class);
 
-    fundamentalTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
-    socialMediaGroup.fullyConnected(fundamentalTraderGroup, Links.SocialNetworkLink.class);
+//    fundamentalTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+//    socialMediaGroup.fullyConnected(fundamentalTraderGroup, Links.SocialNetworkLink.class);
 
     influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
 
@@ -189,7 +184,15 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     Sequence subSequencePrice =
         Sequence.create(
             Market.sendPriceToTraders,
-            Trader.processMarketPrice,
+
+            Split.create(
+                Split.create(
+                    MomentumTrader.updateMomentum,
+                    MomentumTrader.updateParamsAlpha
+                ),
+                Trader.submitLimitOrders
+            ),
+
             Split.create(
                 Market.calcPriceImpact,
                 Market.updateTrueValue
@@ -199,11 +202,11 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     Sequence subSequenceOpinion =
         Sequence.create(
             Split.create(
-                FundamentalTrader.shareOpinion,
+                MomentumTrader.shareOpinion,
                 Influencer.shareOpinion
             ),
             SocialNetwork.publishOpinions,
-            FundamentalTrader.fetchAndAdjustOpinion
+            MomentumTrader.fetchAndAdjustOpinion
         );
 
     run(
@@ -212,8 +215,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
             subSequenceOpinion
         ),
         Split.create(
-            FundamentalTrader.adjustIntrinsicValue,
-            MomentumTrader.calcMA
+            FundamentalTrader.adjustIntrinsicValue
         )
     );
 

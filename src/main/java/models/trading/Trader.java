@@ -3,16 +3,14 @@ package models.trading;
 import models.trading.Links.TradeLink;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
-import simudyne.core.annotations.Input;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
 public abstract class Trader extends Agent<TradingModel.Globals> {
 
+  public enum Side {BUY, SELL}
 
   public enum Type {Noise, Fundamental, Momentum, MI, Opinionated, Coordinated}
-
-  ;
    /*
    ------- Trader type -------
    Noise trader (uninformed): will randomly buy or sell
@@ -53,12 +51,29 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     return Action.create(Trader.class, consumer);
   }
 
-  public static Action<Trader> processMarketPrice =
+  public static Action<Trader> submitLimitOrders =
       action(
           t -> {
             if (!t.isBroke) {
 
-              t.tradeStrategy();
+              double alpha = t.getAlpha();
+              if ((t.getPrng().uniform(0, 1).sample() < alpha)) {
+                Side side = t.getSide();
+                int volume = t.getVolume();
+                switch (side) {
+                  case BUY:
+                    t.handleWhenBuyShares(volume);
+                    break;
+                  case SELL:
+                    t.handleWhenSellShares(volume);
+                    break;
+                }
+              } else {
+                System.out.println("trader holds");
+//                t.hold();
+              }
+
+//              t.tradeStrategy();
 
               if (t.timeSinceShort > -1) { // short selling
                 t.handleDuringShortSelling();
@@ -71,7 +86,13 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
           }
       );
 
-  protected abstract void tradeStrategy();
+  protected abstract double getAlpha();
+
+  protected abstract Side getSide();
+
+  protected abstract int getVolume();
+
+//  protected abstract void tradeStrategy();
 
   protected void hold() {
     buy(0);
@@ -156,7 +177,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     }
 
     if (timeSinceShort++ > shortDuration) {
-      coverShortPosition(Math.abs(shares));
+      closeShortPosition(Math.abs(shares));
     }
   }
 
@@ -167,10 +188,10 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   protected void forceLiquidateShortPosition() {
-    coverShortPosition(Math.abs(shares));
+    closeShortPosition(Math.abs(shares));
   }
 
-  protected void coverShortPosition(double sharesToCover) {
+  protected void closeShortPosition(double sharesToCover) {
 
     buy(sharesToCover);
     resetMarginAccount();
@@ -184,6 +205,8 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   protected void buy(double amountToBuy) {
+
+    System.out.println("buy " + amountToBuy + " shares");
 
     if (shares < 0) {
       getLongAccumulator("coverShorts").add((long) amountToBuy);
@@ -249,7 +272,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   protected void sell(double sharesToSell) {
-
+    System.out.println("sell " + sharesToSell + " shares");
     getLongAccumulator("sells").add((long) sharesToSell);
     getLinks(TradeLink.class).send(Messages.SellOrderPlaced.class, sharesToSell);
 

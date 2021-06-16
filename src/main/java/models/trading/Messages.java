@@ -9,13 +9,13 @@ public class Messages {
 
   public static class SellOrderPlaced extends Message.Double {}
 
-  public static class MarketPrice extends Message.Double {}
+  public static class MarketPrice extends Message.Float {}
 
   public static class ShortSellOrderPlaced extends Message.Double {}
 
   public static class CoverShortPosOrderPlaced extends Message.Double {}
 
-  public static class MarketShock extends Message.Integer {} // for test purpose
+//  public static class MarketShock extends Message.Integer {} // for test purpose
 
   public static class TraderOpinionShared extends Message.Double {}
 
@@ -30,4 +30,6 @@ public class Messages {
   public static class HistoricalPrices extends Message {
     HashMap<java.lang.Long, java.lang.Double> historicalPrices;
   }
+
+  public static class Tick extends Message.Long {}
 }

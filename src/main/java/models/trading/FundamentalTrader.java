@@ -27,6 +27,8 @@ public class FundamentalTrader extends Trader {
   @Variable
   public double zScore; /* intrinsic Value without opinion for comparison */
 
+  double priceDistortion;
+
   /* ------------------ functions definition -------------------------*/
 
   private static Action<FundamentalTrader> action(
@@ -35,39 +37,67 @@ public class FundamentalTrader extends Trader {
   }
 
   @Override
-  protected void tradeStrategy() {
+  protected double getAlpha() {
 
     System.out.println("-------------- fundamental trader strategy --------------");
     System.out.println("Trader id: " + getID());
 
-    double price = getMessageOfType(MarketPrice.class).getBody();
-    System.out.println("get a market price" + price);
+    priceDistortion = getPriceDistortion();
+    return Math.abs(priceDistortion) * getGlobals().sensitivity;
+  }
 
-    double priceDistortion = intrinsicValue - price;
+  @Override
+  protected int getVolume() {
+    return (int) Math.ceil(Math.abs(priceDistortion) * getGlobals().sensitivity);
+  }
 
+  @Override
+  protected Side getSide() {
+    return priceDistortion > 0 ? Side.BUY : Side.SELL;
+  }
+
+  private double getPriceDistortion() {
+    float price = getMessageOfType(MarketPrice.class).getBody();
     System.out.println("Intrinsic: " + intrinsicValue);
     System.out.println("market price: " + price);
 
-    double alpha = priceDistortion * getGlobals().sensitivity;
-
-    // if U(0,1) < alpha: buy / sell else hold
-    if ((getPrng().uniform(0, 1).sample() < Math.abs(alpha)) && alpha != 0) {
-
-      int volume = (int) Math.ceil(Math.abs(alpha));
-
-      if (alpha > 0) {        // buy
-        System.out.println("Amount shares to buy: " + volume);
-        handleWhenBuyShares(volume);
-
-      } else if (alpha < 0) { // sell
-        System.out.println("Amount shares to sell: " + volume);
-        handleWhenSellShares(volume);
-      }
-
-    } else {
-      hold();
-    }
+    return intrinsicValue - price;
   }
+
+//  @Override
+//  protected void tradeStrategy() {
+//
+//    System.out.println("-------------- fundamental trader strategy --------------");
+//    System.out.println("Trader id: " + getID());
+//
+//    double price = getMessageOfType(MarketPrice.class).getBody();
+//    System.out.println("get a market price" + price);
+//
+//    double priceDistortion = intrinsicValue - price;
+//
+//    System.out.println("Intrinsic: " + intrinsicValue);
+//    System.out.println("market price: " + price);
+//
+//    double alpha = Math.abs(priceDistortion) * getGlobals().sensitivity;
+//
+//    // if U(0,1) < alpha: buy / sell else hold
+//    if ((getPrng().uniform(0, 1).sample() < Math.abs(alpha)) && alpha != 0) {
+//
+//      int volume = (int) Math.ceil(Math.abs(alpha));
+//
+//      if (alpha > 0) {        // buy
+//        System.out.println("Amount shares to buy: " + volume);
+//        handleWhenBuyShares(volume);
+//
+//      } else if (alpha < 0) { // sell
+//        System.out.println("Amount shares to sell: " + volume);
+//        handleWhenSellShares(volume);
+//      }
+//
+//    } else {
+//      hold();
+//    }
+//  }
 
   /* random walk - brownian motion - keep estimate */
   public static Action<FundamentalTrader> adjustIntrinsicValue =
@@ -99,64 +129,8 @@ public class FundamentalTrader extends Trader {
           });
 
 
-  /* share opinion to the social network */
-  public static Action<FundamentalTrader> shareOpinion =
-      action(
-          t -> {
-            t.getLinks(SocialNetworkLink.class).send(Messages.TraderOpinionShared.class, t.opinion);
-            System.out.println("Trader " + t.getID() + " sent opinion");
-          });
 
-  /* fetch the opinion from social network and update the self opinion accordingly */
-  public static Action<FundamentalTrader> fetchAndAdjustOpinion =
-      action(
-          t -> {
-            System.out.println("Trader ID " + t.getID() + " received opinion");
-            t.adjustOpinionWithInfluencerOpinion();
-            t.adjustOpinionWithTradersOpinions();
-          });
 
-  /* take opinion from other trader agents */
-  public void adjustOpinionWithTradersOpinions() {
-
-    double[] opinionsList = getMessageOfType(Messages.SocialNetworkOpinion.class).opinionList;
-    getDoubleAccumulator("opinions").add(opinion);
-
-    int count = 0;
-    for (double o : opinionsList) {
-      if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
-        count++;
-        opinion += (o - opinion) * getGlobals().gamma;
-
-        /* dynamics confidence factor */
-        // it doesnt work well because the opinions considered are still close to the self opinion,
-        // so it converges super quickly
-//        double gamma = 1 / (Math.abs(o - opinion) + 1);
-//        double beta = 1 - gamma;
-        /* opinion = opinion * selfConfidence + otherOpinion * ConfidenceToOther */
-//        opinion = opinion * beta + o * gamma;
-      }
-    }
-    System.out.println(count + " opinions out of " + opinionsList.length + " opinions considered");
-  }
-
-  /* take opinion from influencer */
-  public void adjustOpinionWithInfluencerOpinion() {
-
-    if (hasMessageOfType(InfluencerSocialNetworkOpinion.class)) {
-      double influencerOpinion = getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
-
-      System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + influencerOpinion);
-
-//      if (opinion > 0) {
-//        opinion += (influencerOpinion - opinion) * (getGlobals().gamma + 0.005);
-//      }
-
-      double confidenceFactor = (1 / (Math.abs(influencerOpinion - opinion) + getGlobals().k));
-      opinion += (influencerOpinion - opinion) * confidenceFactor;
-//      System.out.println("opinion after Elon: " + opinion);
-    }
-  }
 
 }
 

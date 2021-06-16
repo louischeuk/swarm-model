@@ -1,6 +1,5 @@
 package models.trading;
 
-import java.util.HashMap;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -10,7 +9,7 @@ import simudyne.core.graph.Message.Double;
 public class Market extends Agent<TradingModel.Globals> {
 
   @Variable
-  public double price;
+  public float price;
 
   @Variable
   public double trueValue;
@@ -19,8 +18,6 @@ public class Market extends Agent<TradingModel.Globals> {
   long tick = 0L;
 //  int marketShockStep = 50;
 
-  HashMap<Long, java.lang.Double> historicalPrices;
-
   /* --------- function definitions --------- */
 
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
@@ -28,11 +25,10 @@ public class Market extends Agent<TradingModel.Globals> {
   }
 
   public static Action<Market> sendPriceToTraders =
-      action(
-          m -> {
-            m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
-            MomentumTrader.tick = m.tick;
-          });
+      action(m -> {
+        m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
+        m.getLinks(Links.TradeLink.class).send(Messages.Tick.class, m.tick);
+      });
 
 
   public static Action<Market> calcPriceImpact =
@@ -53,7 +49,6 @@ public class Market extends Agent<TradingModel.Globals> {
                 "Total buys shares: " + buys + " (with cover short Pos: " + covers + ")");
             System.out.println(
                 "Total sell shares: " + sells + " (with short-sell shares: " + shorts + ")");
-            System.out.println("Total volume: " + (buys + sells));
 
             double netDemand = buys - sells;
             System.out.println("Net demand: " + netDemand);
@@ -75,14 +70,11 @@ public class Market extends Agent<TradingModel.Globals> {
 //                  m.getLinks(Links.TradeLink.class).send(Messages.MarketShock.class, marketShockStep);
 //            }
 
-            /* for momentum traders to update the moving averages */
-            m.historicalPrices.put(++m.tick, m.price);
+            ++m.tick;
             System.out.println("Time step: " + m.tick + "\n");
 
-            m.getLinks(Links.TradeLink.class).send(Messages.HistoricalPrices.class,
-                (a, t) -> a.historicalPrices = m.historicalPrices);
-            MomentumTrader.tick = m.tick;
             m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
+            m.getLinks(Links.TradeLink.class).send(Messages.Tick.class, m.tick);
 
           });
 

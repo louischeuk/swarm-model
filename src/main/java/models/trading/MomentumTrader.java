@@ -1,159 +1,153 @@
 package models.trading;
 
-import java.util.HashMap;
-import models.trading.Messages.HistoricalPrices;
+import models.trading.Links.SocialNetworkLink;
+import models.trading.Messages.InfluencerSocialNetworkOpinion;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
 public class MomentumTrader extends Trader {
 
-  static long tick; /* equal to the global tick. just to avoid ticks being passed around */
-  static long shortTermMALookBackPeriod = 7;
-  static long longTermMALookBackPeriod = 21;
-  static double smoothing = 2;
-  static int crossoverDirection = 0;   /* 1: upward(↗)(buy) | 0: hold | -1: downward(↘)(sell) */
+  @Variable
+  public double opinion;
 
   @Variable
-  public double shortTermSMA;
+  public double momentum = 0.0;
 
-  @Variable
-  public double longTermSMA;
+  public float lastMarketPrice = 0.0F;
 
-  @Variable
-  public double shortTermEMA;
 
-  @Variable
-  public double longTermEMA;
+  enum mtParams {
+    alpha(0.0),
+    beta(0.5),
+    gamma(0.5);
+    private double val;
 
-  private static Action<MomentumTrader> action(SerializableConsumer<MomentumTrader> consumer) {
+    mtParams(double v) {
+      this.val = v;
+    }
+  }
+
+  private static Action<MomentumTrader> action(
+      SerializableConsumer<MomentumTrader> consumer) {
     return Action.create(MomentumTrader.class, consumer);
   }
 
   @Override
-  protected void tradeStrategy() {
+  protected double getAlpha() {
     System.out.println("********* momentum trader strategy *********");
     System.out.println("Trader id: " + getID());
-    System.out.println("tick: " + tick);
 
-    if (tick > longTermMALookBackPeriod) {
-      System.out.println("can trade");
-      if (getPrng().uniform(0, 1).sample() < getGlobals().probabilityMomentumTrade) {
+    System.out.println("alpha: " + mtParams.alpha.val);
+    System.out.println("beta: " + mtParams.beta.val);
+    System.out.println("gamma: " + mtParams.gamma.val);
 
-        int volume = (int) Math.abs(getPrng().normal(0, getGlobals().stdDev).sample());
-        System.out.println("Volume: " + volume);
+    return mtParams.beta.val * getDemand();
+  }
 
-        switch (crossoverDirection) {
-          case 1:
-            System.out.println("Time to buy");
-            handleWhenBuyShares(volume);
-            break;
-          case -1:
-            System.out.println("Time to sell");
-            handleWhenSellShares(volume);
-            break;
-          case 0:
-            System.out.println("momentum trader holds");
-            hold();
-            break;
-        }
+  private double getDemand() {
+    return Math.tanh(Math.abs(momentum) * mtParams.gamma.val);
+  }
 
+  @Override
+  protected Side getSide() {
+    System.out.println("momentum: " + momentum);
+    return momentum > 0 ? Side.BUY : Side.SELL;
+  }
+
+  @Override
+  protected int getVolume() {
+    int volume = (int) Math.abs(getPrng().normal(0, getGlobals().stdDev).sample() + momentum);
+    System.out.println("Volume: " + volume);
+    return volume;
+  }
+
+  public static Action<MomentumTrader> updateMomentum =
+      action(
+          t -> {
+            float price = t.getMessageOfType(Messages.MarketPrice.class).getBody();
+
+            if (t.lastMarketPrice != 0) {
+              t.momentum =
+                  mtParams.alpha.val * (price - t.lastMarketPrice) + (1.0 - mtParams.alpha.val)
+                      * t.momentum;
+              System.out.println("New momentum: " + t.momentum);
+            }
+            t.lastMarketPrice = price;
+            System.out.println("last market price " + t.lastMarketPrice);
+          }
+      );
+
+
+  public static Action<MomentumTrader> updateParamsAlpha =
+      action(
+          t -> {
+            long tick = t.getMessageOfType(Messages.Tick.class).getBody();
+            System.out.println("get tick " + tick);
+            if (tick != 0) {
+              mtParams.alpha.val = (float) (tick - 1) / tick;
+            }
+          }
+      );
+
+  /* share opinion to the social network */
+  public static Action<MomentumTrader> shareOpinion =
+      action(
+          t -> {
+            t.getLinks(SocialNetworkLink.class).send(Messages.TraderOpinionShared.class, t.opinion);
+            System.out.println("Trader " + t.getID() + " sent opinion");
+          });
+
+  /* fetch the opinion from social network and update the self opinion accordingly */
+  public static Action<MomentumTrader> fetchAndAdjustOpinion =
+      action(
+          t -> {
+            System.out.println("Trader ID " + t.getID() + " received opinion");
+            t.adjustOpinionWithInfluencerOpinion();
+            t.adjustOpinionWithTradersOpinions();
+          });
+
+  /* take opinion from other trader agents */
+  public void adjustOpinionWithTradersOpinions() {
+
+    double[] opinionsList = getMessageOfType(Messages.SocialNetworkOpinion.class).opinionList;
+    getDoubleAccumulator("opinions").add(opinion);
+
+    int count = 0;
+    for (double o : opinionsList) {
+      if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
+        count++;
+        opinion += (o - opinion) * getGlobals().gamma;
+
+        /* dynamics confidence factor */
+        // it doesnt work well because the opinions considered are still close to the self opinion,
+        // so it converges super quickly
+//        double gamma = 1 / (Math.abs(o - opinion) + 1);
+//        double beta = 1 - gamma;
+        /* opinion = opinion * selfConfidence + otherOpinion * ConfidenceToOther */
+//        opinion = opinion * beta + o * gamma;
       }
     }
+    System.out.println(count + " opinions out of " + opinionsList.length + " opinions considered");
   }
 
-  /* ----------- SMA --------------- */
-  private double getShortTermSMA() {
-    return getSMA(shortTermMALookBackPeriod);
-  }
+  /* take opinion from influencer */
+  public void adjustOpinionWithInfluencerOpinion() {
 
-  private double getLongTermSMA() {
-    return getSMA(longTermMALookBackPeriod);
-  }
+    if (hasMessageOfType(InfluencerSocialNetworkOpinion.class)) {
+      double influencerOpinion = getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
 
-  private double getSMA(long lookBackPeriod) {
+      System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + influencerOpinion);
 
-    HashMap<Long, Double> historicalPrices = getMessageOfType(
-        HistoricalPrices.class).historicalPrices;
+//      if (opinion > 0) {
+//        opinion += (influencerOpinion - opinion) * (getGlobals().gamma + 0.005);
+//      }
 
-    double SMA = 0;
-    int count = 0;
-    for (long i = MomentumTrader.tick; i > MomentumTrader.tick - lookBackPeriod; i--) {
-      SMA += historicalPrices.get(i);
-      count++;
+      double confidenceFactor = (1 / (Math.abs(influencerOpinion - opinion) + getGlobals().k));
+      opinion += (influencerOpinion - opinion) * confidenceFactor;
+//      System.out.println("opinion after Elon: " + opinion);
     }
-
-    System.out.println("Days counted: " + count);
-    return SMA / lookBackPeriod;
   }
-
-  /* ----------- EMA --------------- */
-  private double getShortTermEMA() {
-    return getEMA(shortTermMALookBackPeriod, shortTermEMA);
-  }
-
-  private double getLongTermEMA() {
-    return getEMA(longTermMALookBackPeriod, longTermEMA);
-  }
-
-  private double getEMA(long lookBackPeriod, double yesterdayEMA) {
-    double closingPrice = getMessageOfType(Messages.MarketPrice.class).getBody();
-    double multiplier = smoothing / (1 + lookBackPeriod);
-
-    /* EMA = Closing price x multiplier + EMA (previous day) x (1-multiplier) */
-    return closingPrice * multiplier + yesterdayEMA * (1 - multiplier);
-  }
-
-  public static Action<MomentumTrader> calcMA =
-      action(t -> {
-
-        System.out.println("tick at momentum trader calMA action: " + tick);
-
-        if (MomentumTrader.tick == longTermMALookBackPeriod) { // first SMA / EMA
-          System.out.println("get first SMA and LMA at tick " + tick);
-          t.shortTermEMA = t.shortTermSMA = t.getShortTermSMA();
-          t.longTermEMA = t.longTermSMA = t.getLongTermSMA();
-        }
-
-        if (tick > longTermMALookBackPeriod) {
-          double curShortTermSMA = t.getShortTermSMA();
-          double curLongTermSMA = t.getLongTermSMA();
-//
-////          System.out.println("prev short-term SMA: " + t.shortTermSMA);
-////          System.out.println("prev long-term SMA: " + t.longTermSMA);
-////          System.out.println("cur short-term SMA: " + curShortTermSMA);
-////          System.out.println("cur long-term SMA: " + curLongTermSMA);
-//
-//          if (t.shortTermSMA < t.longTermSMA && curShortTermSMA >= curLongTermSMA) {
-//            t.crossover = 1;
-//          } else if (t.shortTermSMA > t.longTermSMA && curShortTermSMA <= curLongTermSMA) {
-//            t.crossover = -1;
-//          } else {
-//            t.crossover = 0;
-//          }
-//
-          // cur moving averages becomes yesterday moving averages
-          t.shortTermSMA = curShortTermSMA;
-          t.longTermSMA = curLongTermSMA;
-
-          /* --------------------------------------------------- */
-
-          /* EMA version */
-          double curShortTermEMA = t.getShortTermEMA();
-          double curLongTermEMA = t.getLongTermEMA();
-
-          if (t.shortTermEMA < t.longTermEMA && curShortTermEMA >= curLongTermEMA) {
-            crossoverDirection = 1;
-          } else if (t.shortTermEMA > t.longTermEMA && curShortTermEMA <= curLongTermEMA) {
-            crossoverDirection = -1;
-          } else {
-            crossoverDirection = 0;
-          }
-
-          // cur moving averages becomes yesterday moving averages
-          t.shortTermEMA = curShortTermEMA;
-          t.longTermEMA = curLongTermEMA;
-
-        }
-      });
 }
+
+

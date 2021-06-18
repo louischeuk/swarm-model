@@ -1,6 +1,9 @@
 package models.trading;
 
+import com.google.common.primitives.Doubles;
+import java.util.List;
 import models.trading.Links.SocialNetworkLink;
+import models.trading.Messages.TraderOpinionShared;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.functions.SerializableConsumer;
@@ -20,26 +23,25 @@ public class SocialNetwork extends Agent<TradingModel.Globals> {
           });
 
 
+  /* handle opinions from influencer agent */
   private void publishInfluencerOpinion() {
-    // handle opinions from influencer agent
     if (hasMessagesOfType(Messages.InfluencerOpinionShared.class)) {
       double influencerOpinion = getMessageOfType(Messages.InfluencerOpinionShared.class).getBody();
 
-      System.out.println(
-          "Social media platform received Elon Musk's " + influencerOpinion + " opinion");
+      System.out.println("Social media platform received Elon's " + influencerOpinion + " opinion");
 
       getLinks(SocialNetworkLink.class)
           .send(Messages.InfluencerSocialNetworkOpinion.class, influencerOpinion);
     }
   }
 
+  /* handle opinions from trader agent */
   private void publishTradersOpinions() {
-    // handle opinions from trader agent
-    double[] opinionsList = getMessagesOfType(Messages.TraderOpinionShared.class).stream()
+    double[] opinionsListRaw = getMessagesOfType(TraderOpinionShared.class).stream()
         .mapToDouble(Double::getBody).toArray();
 
-    System.out.println(
-        "Social media platform received " + opinionsList.length + " opinion");
+    List<java.lang.Double> opinionsList = Doubles.asList(opinionsListRaw);
+    System.out.println("Social media platform received " + opinionsList.size() + " opinion");
 
     getLinks(SocialNetworkLink.class)
         .send(Messages.SocialNetworkOpinion.class, (s, t) -> s.opinionList = opinionsList);

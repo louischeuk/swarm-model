@@ -1,7 +1,9 @@
 package models.trading;
 
+import java.util.List;
 import models.trading.Links.SocialNetworkLink;
 import models.trading.Messages.InfluencerSocialNetworkOpinion;
+import models.trading.Messages.SocialNetworkOpinion;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
@@ -14,22 +16,9 @@ public class MomentumTrader extends Trader {
   @Variable
   public double momentum = 0.0;
 
-  public float lastMarketPrice = 0.0F;
+  float lastMarketPrice = 0.0F;
 
-
-  enum mtParams {
-    alpha(0.0),
-    beta(0.5),
-    gamma(0.5);
-    private double val;
-
-    mtParams(double v) {
-      this.val = v;
-    }
-  }
-
-  private static Action<MomentumTrader> action(
-      SerializableConsumer<MomentumTrader> consumer) {
+  private static Action<MomentumTrader> action(SerializableConsumer<MomentumTrader> consumer) {
     return Action.create(MomentumTrader.class, consumer);
   }
 
@@ -37,16 +26,13 @@ public class MomentumTrader extends Trader {
   protected double getAlpha() {
     System.out.println("********* momentum trader strategy *********");
     System.out.println("Trader id: " + getID());
+    System.out.println("alpha: " + MtParams.alpha);
 
-    System.out.println("alpha: " + mtParams.alpha.val);
-    System.out.println("beta: " + mtParams.beta.val);
-    System.out.println("gamma: " + mtParams.gamma.val);
-
-    return mtParams.beta.val * getDemand();
+    return MtParams.beta * getDemand();
   }
 
   private double getDemand() {
-    return Math.tanh(Math.abs(momentum) * mtParams.gamma.val);
+    return Math.tanh(Math.abs(momentum) * MtParams.gamma);
   }
 
   @Override
@@ -57,7 +43,7 @@ public class MomentumTrader extends Trader {
 
   @Override
   protected int getVolume() {
-    int volume = (int) Math.abs(getPrng().normal(0, getGlobals().stdDev).sample() + momentum);
+    int volume = (int) Math.abs(momentum * MtParams.momentumWeighting + opinion);
     System.out.println("Volume: " + volume);
     return volume;
   }
@@ -66,11 +52,10 @@ public class MomentumTrader extends Trader {
       action(
           t -> {
             float price = t.getMessageOfType(Messages.MarketPrice.class).getBody();
-
             if (t.lastMarketPrice != 0) {
               t.momentum =
-                  mtParams.alpha.val * (price - t.lastMarketPrice) + (1.0 - mtParams.alpha.val)
-                      * t.momentum;
+                  MtParams.alpha * (price - t.lastMarketPrice)
+                      + (1.0 - MtParams.alpha) * t.momentum;
               System.out.println("New momentum: " + t.momentum);
             }
             t.lastMarketPrice = price;
@@ -78,14 +63,15 @@ public class MomentumTrader extends Trader {
           }
       );
 
-
+  /* update mtParams.alpha = (t-1)/t */
   public static Action<MomentumTrader> updateParamsAlpha =
       action(
           t -> {
             long tick = t.getMessageOfType(Messages.Tick.class).getBody();
-            System.out.println("get tick " + tick);
             if (tick != 0) {
-              mtParams.alpha.val = (float) (tick - 1) / tick;
+//              mtParams.alpha.val = (double) (tick - 1) / tick;
+              MtParams.alpha = (double) (tick - 1) / tick;
+
             }
           }
       );
@@ -103,32 +89,32 @@ public class MomentumTrader extends Trader {
       action(
           t -> {
             System.out.println("Trader ID " + t.getID() + " received opinion");
-            t.adjustOpinionWithInfluencerOpinion();
-            t.adjustOpinionWithTradersOpinions();
+//            t.adjustOpinionWithInfluencerOpinion();
+//            t.adjustOpinionWithTradersOpinions();
           });
 
   /* take opinion from other trader agents */
   public void adjustOpinionWithTradersOpinions() {
 
-    double[] opinionsList = getMessageOfType(Messages.SocialNetworkOpinion.class).opinionList;
+    List<Double> opinionsList = getMessageOfType(SocialNetworkOpinion.class).opinionList;
     getDoubleAccumulator("opinions").add(opinion);
 
-    int count = 0;
-    for (double o : opinionsList) {
-      if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
-        count++;
-        opinion += (o - opinion) * getGlobals().gamma;
+    double count = opinionsList.stream().
+        filter(o -> Math.abs(o) - opinion < getGlobals().vicinityRange).count();
+    System.out.println(count + " opinions out of " + opinionsList.size() + " opinions considered");
 
-        /* dynamics confidence factor */
+    opinionsList.stream()
+        .filter(o -> Math.abs(o - opinion) < getGlobals().vicinityRange)
+        .forEach(o -> opinion += (o - opinion) * getGlobals().gamma);
+
+    /* dynamics confidence factor */
         // it doesnt work well because the opinions considered are still close to the self opinion,
         // so it converges super quickly
 //        double gamma = 1 / (Math.abs(o - opinion) + 1);
 //        double beta = 1 - gamma;
-        /* opinion = opinion * selfConfidence + otherOpinion * ConfidenceToOther */
+//        /* opinion = opinion * selfConfidence + otherOpinion * ConfidenceToOther */
 //        opinion = opinion * beta + o * gamma;
-      }
-    }
-    System.out.println(count + " opinions out of " + opinionsList.length + " opinions considered");
+
   }
 
   /* take opinion from influencer */

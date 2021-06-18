@@ -14,20 +14,22 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of FT Traders")
-  public int numFundamentalTrader = 1;
+  public int numFundamentalTrader = 90;
 
   @Constant(name = "Number of Noise Traders")
-  public int numNoiseTrader = 1;
+  public int numNoiseTrader = 0;
 
   @Constant(name = "Number of Momentum Traders")
-  public int numMomentumTrader = 1;
+  public int numMomentumTrader = 20;
+
+  @Constant(name = "Number of Coordinated Traders")
+  public int numCoordinatedTrader = 0;
 
   @Input(name = "Market price")
   public float marketPrice = 80.0F;
 
   @Input(name = "Market True value") /* aka market equilibrium */
-  public double trueValue = 100.0;
-
+  public double trueValue = 120.0;
 
   public static final class Globals extends GlobalState {
 
@@ -57,22 +59,25 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     @Input(name = "vicinity Range")
     public double vicinityRange = 2; /* upon 1.5, all opinions converged */
 
-    @Input(name = "Trust to average of other opinions")
-    public double gamma = 0.001; /* speed of convergence of opinions */
+    @Input(name = "Trust to average of other opinions") /* speed of convergence of opinions */
+    public double gamma = 0.001;
 
     @Input(name = "influencer weighting") /* larger k, lower speed of convergence */
     public double k = 10;
 
-    /* 0-1, larger number means a higher probability to trade in step */
-    @Input(name = "Probability of momentum trade")
-    public double probabilityMomentumTrade = 1;
+    @Input(name = "Opinion of influencer")
+    public double influencerOpinion = 3;
+
+    @Input(name = "Opinion of Coordinated T")
+    public double coordinatedTraderOpinion = 3;
 
     /* 0-1, larger number means a higher probability to trade in step */
     @Input(name = "Probability of noise trade")
     public double probabilityNoiseTrade = 1;
 
-    @Input(name = "Opinion of influencer")
-    public double influencerOpinion = 5;
+    /* 0-1, larger number means a higher probability to trade in step */
+    @Input(name = "Probability of coordinated trade")
+    public double probabilityCoordinatedTrade = 1;
 
   }
 
@@ -82,13 +87,13 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createLongAccumulator("buys", "Number of buy orders");
     createLongAccumulator("sells", "Number of sell orders");
     createLongAccumulator("shorts", "Number of short sell orders");           /* inclusive */
-    createLongAccumulator("coverShorts", "Number of short position covered"); /* inclusive */
+    createLongAccumulator("closeShorts", "Number of short position covered"); /* inclusive */
     createDoubleAccumulator("price", "Market price");
     createDoubleAccumulator("opinions", "Opinions");
 
     registerAgentTypes(
         Market.class,
-        FundamentalTrader.class, NoiseTrader.class, MomentumTrader.class,
+        FundamentalTrader.class, NoiseTrader.class, MomentumTrader.class, CoordinatedTrader.class,
         SocialNetwork.class, Influencer.class
     );
 
@@ -98,31 +103,34 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   @Override
   public void setup() {
 
-    int numTrader = numFundamentalTrader + numMomentumTrader + numNoiseTrader;
     /* ---------------------- Groups creation ---------------------- */
+
+    Group<SocialNetwork> socialMediaGroup = generateGroup(SocialNetwork.class, 1);
 
     Group<Market> marketGroup = generateGroup(Market.class, 1,
         m -> {
-          m.numTraders = numTrader;
           m.price = marketPrice;
           m.trueValue = trueValue;
         });
 
-    Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
-        numFundamentalTrader, t -> {
-          /* parent class variable */
-          t.type = Type.Fundamental;
-          t.wealth = t.getPrng().exponential(100000000).sample();
-//      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
-          t.shortDuration = t.getGlobals().shortSellDuration;
 
-          /* child class variables */
-          t.intrinsicValue = t.getPrng().normal(trueValue, getGlobals().stdDev).sample();
-          t.intrinsicNoOpnDynamics = t.intrinsicValue;
-          t.opinion = t.getPrng().normal(0, 1).sample();
-          t.zScore = t.opinion;
-          System.out.println("Trader type: " + t.type);
-        });
+    if (numFundamentalTrader > 0) {
+      Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
+          numFundamentalTrader, t -> {
+            t.type = Type.Fundamental;
+            t.wealth = t.getPrng().exponential(100000000).sample();
+//      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
+            t.shortDuration = t.getGlobals().shortSellDuration;
+
+            t.intrinsicValue = t.getPrng().normal(trueValue, getGlobals().stdDev).sample();
+            t.zScore = t.getPrng().normal(0, 1).sample();
+            System.out.println("Trader type: " + t.type);
+          });
+
+      fundamentalTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
+      marketGroup.fullyConnected(fundamentalTraderGroup, Links.TradeLink.class);
+    }
+
 
     if (numNoiseTrader > 0) {
       Group<NoiseTrader> noiseTraderGroup = generateGroup(NoiseTrader.class, numNoiseTrader, t -> {
@@ -138,7 +146,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     if (numMomentumTrader > 0) {
       Group<MomentumTrader> momentumTraderGroup = generateGroup(MomentumTrader.class,
-          numNoiseTrader, t -> {
+          numMomentumTrader, t -> {
             t.wealth = t.getPrng().exponential(100000000).sample();
             t.shortDuration = t.getGlobals().shortSellDuration;
 
@@ -150,11 +158,27 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
       momentumTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
       marketGroup.fullyConnected(momentumTraderGroup, Links.TradeLink.class);
 
-      momentumTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
-      marketGroup.fullyConnected(momentumTraderGroup, Links.TradeLink.class);
+      momentumTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+      socialMediaGroup.fullyConnected(momentumTraderGroup, Links.SocialNetworkLink.class);
     }
 
-    Group<SocialNetwork> socialMediaGroup = generateGroup(SocialNetwork.class, 1);
+    if (numCoordinatedTrader > 0) {
+      Group<CoordinatedTrader> coordinatedTraderGroup = generateGroup(CoordinatedTrader.class,
+          numCoordinatedTrader, t -> {
+            t.wealth = t.getPrng().exponential(100000000).sample();
+            t.shortDuration = t.getGlobals().shortSellDuration;
+            t.type = Type.Coordinated;
+            t.opinion = getGlobals().coordinatedTraderOpinion;;
+            System.out.println("Trader type: " + t.type);
+          });
+
+      coordinatedTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
+      marketGroup.fullyConnected(coordinatedTraderGroup, Links.TradeLink.class);
+
+      coordinatedTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+      socialMediaGroup.fullyConnected(coordinatedTraderGroup, Links.SocialNetworkLink.class);
+    }
+
 
     Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
         i -> {
@@ -164,32 +188,28 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
         });
 
     /* ---------------------- connections ---------------------- */
-
-    fundamentalTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
-    marketGroup.fullyConnected(fundamentalTraderGroup, Links.TradeLink.class);
-
-//    fundamentalTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
-//    socialMediaGroup.fullyConnected(fundamentalTraderGroup, Links.SocialNetworkLink.class);
-
     influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
 
     super.setup();
-
   }
 
   @Override
   public void step() {
     super.step();
 
+    Sequence subSequenceUpdateMomentumAndParams =
+        Sequence.create(
+            Split.create(
+                MomentumTrader.updateParamsAlpha,
+                MomentumTrader.updateMomentum
+            )
+        );
+
     Sequence subSequencePrice =
         Sequence.create(
             Market.sendPriceToTraders,
-
             Split.create(
-                Split.create(
-                    MomentumTrader.updateMomentum,
-                    MomentumTrader.updateParamsAlpha
-                ),
+                subSequenceUpdateMomentumAndParams,
                 Trader.submitLimitOrders
             ),
 
@@ -210,13 +230,16 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
         );
 
     run(
-        Split.create(
-            subSequencePrice,
-            subSequenceOpinion
-        ),
-        Split.create(
-            FundamentalTrader.adjustIntrinsicValue
+        Sequence.create(
+            Split.create(
+                subSequencePrice,
+                subSequenceOpinion
+            ),
+            Split.create(
+                FundamentalTrader.adjustIntrinsicValue
+            )
         )
+
     );
 
   }

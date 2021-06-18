@@ -10,16 +10,16 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   public enum Side {BUY, SELL}
 
-  public enum Type {Noise, Fundamental, Momentum, MI, Opinionated, Coordinated}
+  public enum Type {Noise, Fundamental, Momentum, Coordinated, MI, Opinionated}
    /*
    ------- Trader type -------
    Noise trader (uninformed): will randomly buy or sell
    Fundamental trader (informed): force to buy and sell at prices bounded by the intrinsic value
    momentum: buy securities that are rising and sell them when they look to have peaked
+   coordinated: Reddit WSB
    minimal-intelligence trader: adapt to the environment is seen by some as a minimal intelligence
    opinionated: has the knowledge of Limit Order Book.
                         submits quote prices that vary according to its opinion
-   coordinated: Reddit WSB
    */
 
   Type type; /* Trader type */
@@ -27,7 +27,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   public double wealth;
 
   @Variable
-  public double shares = 0;
+  public int shares = 0;
 
   int timeSinceShort = -1;
 
@@ -69,11 +69,9 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
                     break;
                 }
               } else {
-                System.out.println("trader holds");
-//                t.hold();
+                System.out.println("Trader " + t.getID() + " holds");
+                t.hold(); // only uncomment if there are only FT Traders
               }
-
-//              t.tradeStrategy();
 
               if (t.timeSinceShort > -1) { // short selling
                 t.handleDuringShortSelling();
@@ -92,11 +90,8 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   protected abstract int getVolume();
 
-//  protected abstract void tradeStrategy();
-
   protected void hold() {
     buy(0);
-    sell(0);
     System.out.println("Trader " + getID() + " holds");
   }
 
@@ -108,7 +103,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
       if (shares < 0) {
         updateMarginAccount(Math.abs(shares) - sharesToBuy);
       } else {
-        if (shares >= 0 && timeSinceShort > -1) {
+        if (timeSinceShort > -1) {
           resetMarginAccount(); // cover all the shorts position
         }
       }
@@ -128,7 +123,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     }
   }
 
-  protected void handleNotEnoughSharesToSell(double sharesToSell) {
+  protected void handleNotEnoughSharesToSell(int sharesToSell) {
     if (shares > 0) { // partly sell and partly short-sell
       sell(shares);
       if (isShortSellAllowed(sharesToSell - shares)) {
@@ -142,9 +137,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   private void initiateMarginAccount(double sharesToShort) {
-    marginAccount =
-        (sharesToShort * getMarketPrice()) * (1 + initialMarginRequirement);
-
+    marginAccount = (sharesToShort * getMarketPrice()) * (1 + initialMarginRequirement);
 //    System.out.println("Margin account: " + marginAccount);
   }
 
@@ -159,14 +152,13 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   protected boolean isWealthMeetInitialMarginRequirement(double sharesToSell) {
     // example: with 10K investment, you need 5K cash at start
     if (shares == 0) {
-      return wealth
-          >= (sharesToSell * getMarketPrice() * initialMarginRequirement);
+      return wealth >= (sharesToSell * getMarketPrice() * initialMarginRequirement);
     }
 
     // share < 0: (there are already some short positions)
     System.out.println("Hello short shares here is " + shares);
-    return wealth >= (
-        (Math.abs(shares) + sharesToSell) * getMarketPrice() * initialMarginRequirement);
+    return wealth >=
+        ((Math.abs(shares) + sharesToSell) * getMarketPrice() * initialMarginRequirement);
 
   }
 
@@ -191,12 +183,12 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     closeShortPosition(Math.abs(shares));
   }
 
-  protected void closeShortPosition(double sharesToCover) {
+  protected void closeShortPosition(int sharesToCover) {
 
     buy(sharesToCover);
     resetMarginAccount();
 
-    System.out.println("Shorts Position covered lolll");
+    System.out.println("Shorts Position got closed lolll");
 
     if (wealth < 0) {
       System.out.println("wealth drops below -ve: you broke!");
@@ -204,16 +196,18 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     }
   }
 
-  protected void buy(double amountToBuy) {
+  protected void buy(int amountToBuy) {
 
-    System.out.println("buy " + amountToBuy + " shares");
-
-    if (shares < 0) {
-      getLongAccumulator("coverShorts").add((long) amountToBuy);
-      getLinks(TradeLink.class).send(Messages.CoverShortPosOrderPlaced.class, amountToBuy);
+    if (amountToBuy != 0) {
+      System.out.println("buy " + amountToBuy + " shares");
     }
 
-    getLongAccumulator("buys").add((long) amountToBuy);
+    if (shares < 0) {
+      getLongAccumulator("closeShorts").add(amountToBuy);
+      getLinks(TradeLink.class).send(Messages.CloseShortPosOrderPlaced.class, amountToBuy);
+    }
+
+    getLongAccumulator("buys").add(amountToBuy);
     getLinks(TradeLink.class).send(Messages.BuyOrderPlaced.class, amountToBuy);
 
 //    System.out.println("Previous wealth: " + wealth);
@@ -241,7 +235,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   }
 
-  protected void shortSell(double sharesToShort) {
+  protected void shortSell(int sharesToShort) {
     if (shares < 0) {
       // update margin account with more shorts
       updateMarginAccount(Math.abs(shares) + sharesToShort);
@@ -249,7 +243,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
       initiateMarginAccount(sharesToShort);
     }
 
-    getLongAccumulator("shorts").add((long) sharesToShort);
+    getLongAccumulator("shorts").add(sharesToShort);
     getLinks(TradeLink.class).send(Messages.ShortSellOrderPlaced.class, sharesToShort);
 
     System.out.println("shares of short: " + sharesToShort);
@@ -271,9 +265,9 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 //    System.out.println("~~~~~~Margin account updated: " + marginAccount);
   }
 
-  protected void sell(double sharesToSell) {
+  protected void sell(int sharesToSell) {
     System.out.println("sell " + sharesToSell + " shares");
-    getLongAccumulator("sells").add((long) sharesToSell);
+    getLongAccumulator("sells").add(sharesToSell);
     getLinks(TradeLink.class).send(Messages.SellOrderPlaced.class, sharesToSell);
 
 //    System.out.println("Previous wealth: " + wealth);

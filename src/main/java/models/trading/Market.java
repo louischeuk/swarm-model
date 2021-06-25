@@ -14,7 +14,7 @@ public class Market extends Agent<TradingModel.Globals> {
   @Variable
   public double trueValue;
 
-  private double accumulatedNetDemand;
+  private double netDemand;
 
   private long tick = 0L;
 
@@ -53,8 +53,8 @@ public class Market extends Agent<TradingModel.Globals> {
 
             double netDemand = buys - sells;
             System.out.println("Net demand: " + netDemand);
-            m.accumulatedNetDemand += netDemand;
-            System.out.println("Accumulated net demand: " + m.accumulatedNetDemand);
+            m.netDemand = netDemand;
+            System.out.println("Accumulated net demand: " + m.netDemand);
 
             if (netDemand != 0) {
               double lambda = m.getGlobals().lambda;
@@ -94,14 +94,18 @@ public class Market extends Agent<TradingModel.Globals> {
             */
             System.out.println("prev True value: " + m.trueValue);
 
-            double randomWalk =
+            double dv_exo =
                 m.getPrng().normal(0, m.getGlobals().stdDev).sample() + jumpDiffusionProcess;
 
-            double marketSignal = m.getGlobals().lambda * 2 / 3 * m.accumulatedNetDemand;
-            System.out.println("Market signal: " + marketSignal);
 
-//            m.trueValue = m.trueValue + randomWalk + marketSignal;
-//            m.trueValue = m.trueValue < 0 ? 0 : m.trueValue;
+            // kyle_lambda = 2/3 * m.getGlobals().lambda
+
+//            double dv_endo = m.getGlobals().lambda * 2 / 3 * m.accumulatedNetDemand;
+            double dv_endo = m.netDemand * m.getGlobals().lambda * 2 / 3 ;
+            System.out.println("Market signal: " + dv_endo);
+
+            m.trueValue = m.trueValue + dv_exo + dv_endo;
+            m.trueValue = m.trueValue < 0 ? 0 : m.trueValue;
 
 //            m.trueValue = m.trueValue + marketSignal;
             System.out.println("New True value: " + m.trueValue);

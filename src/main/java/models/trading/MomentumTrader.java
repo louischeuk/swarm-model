@@ -32,7 +32,7 @@ public class MomentumTrader extends Trader {
   }
 
   private double getDemand() {
-    return Math.tanh(Math.abs(momentum) * MtParams.gamma);
+    return Math.tanh(Math.abs(momentum + opinion) * MtParams.gamma);
   }
 
   @Override
@@ -42,11 +42,8 @@ public class MomentumTrader extends Trader {
   }
 
   @Override
-  protected int getVolume() {
-    int volume = (int) Math.abs(momentum * MtParams.momentumWeighting + opinion);
-    System.out.println("Volume: " + volume);
-    return volume;
-  }
+  protected int getVolume() { return 1; }
+
 
   public static Action<MomentumTrader> updateMomentum =
       action(
@@ -70,7 +67,7 @@ public class MomentumTrader extends Trader {
             long tick = t.getMessageOfType(Messages.Tick.class).getBody();
             if (tick != 0) {
 //              mtParams.alpha.val = (double) (tick - 1) / tick;
-              MtParams.alpha = (double) (tick - 1) / tick;
+//              MtParams.alpha = (double) (tick - 1) / tick;
 
             }
           }
@@ -100,22 +97,29 @@ public class MomentumTrader extends Trader {
     getDoubleAccumulator("opinions").add(opinion);
 
     double count = opinionsList.stream().
-        filter(o -> Math.abs(o) - opinion < getGlobals().vicinityRange).count();
+        filter(o -> Math.abs(o - opinion) < getGlobals().vicinityRange).count();
     System.out.println(count + " opinions out of " + opinionsList.size() + " opinions considered");
 
+    // take account of momentum ****!!!!!!!!!!!!!!!
     opinionsList.stream()
         .filter(o -> Math.abs(o - opinion) < getGlobals().vicinityRange)
         .forEach(o -> opinion += (o - opinion) * getGlobals().gamma);
 
     /* dynamics confidence factor */
-        // it doesnt work well because the opinions considered are still close to the self opinion,
-        // so it converges super quickly
+    // it doesnt work well because the opinions considered are still close to the self opinion,
+    // so it converges super quickly
 //        double gamma = 1 / (Math.abs(o - opinion) + 1);
 //        double beta = 1 - gamma;
 //        /* opinion = opinion * selfConfidence + otherOpinion * ConfidenceToOther */
 //        opinion = opinion * beta + o * gamma;
 
   }
+
+
+  /*
+    opinion + and market goes up --> belief
+    opinion + but market goes own --> try not to belief
+  */
 
   /* take opinion from influencer */
   public void adjustOpinionWithInfluencerOpinion() {

@@ -17,10 +17,6 @@ public class NoiseTrader extends Trader {
   }
 
   @Override
-  protected int getVolume() {
-    int volume = (int) Math.abs(getPrng().normal(0, getGlobals().stdDev).sample());
-    System.out.println("Volume: " + volume);
-    return volume;
-  }
+  protected int getVolume() { return 1; }
 }
 

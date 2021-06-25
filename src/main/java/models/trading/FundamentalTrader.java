@@ -29,9 +29,7 @@ public class FundamentalTrader extends Trader {
   }
 
   @Override
-  protected int getVolume() {
-    return (int) Math.ceil(Math.abs(priceDistortion) * getGlobals().sensitivity);
-  }
+  protected int getVolume() { return 1; }
 
   @Override
   protected Side getSide() {

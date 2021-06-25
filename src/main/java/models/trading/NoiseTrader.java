@@ -16,7 +16,5 @@ public class NoiseTrader extends Trader {
     return p > 0.5 ? Side.BUY : Side.SELL;
   }
 
-  @Override
-  protected int getVolume() { return 1; }
 }
 

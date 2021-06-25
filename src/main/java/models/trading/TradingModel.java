@@ -14,16 +14,19 @@ import simudyne.core.annotations.ModelSettings;
 public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   @Constant(name = "Number of FT Traders")
-  public int numFundamentalTrader = 90;
+  public int numFundamentalTrader = 10;
 
   @Constant(name = "Number of Noise Traders")
   public int numNoiseTrader = 0;
 
   @Constant(name = "Number of Momentum Traders")
-  public int numMomentumTrader = 20;
+  public int numMomentumTrader = 10;
 
   @Constant(name = "Number of Coordinated Traders")
   public int numCoordinatedTrader = 0;
+
+  @Constant(name = "Number of influencers")
+  public int numInfluencer = 0;
 
   @Input(name = "Market price")
   public float marketPrice = 80.0F;
@@ -92,12 +95,13 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     createDoubleAccumulator("opinions", "Opinions");
 
     registerAgentTypes(
-        Market.class,
-        FundamentalTrader.class, NoiseTrader.class, MomentumTrader.class, CoordinatedTrader.class,
-        SocialNetwork.class, Influencer.class
+        Market.class, DataProvider.class, SocialNetwork.class, Influencer.class,
+        FundamentalTrader.class, NoiseTrader.class, MomentumTrader.class, CoordinatedTrader.class
     );
 
-    registerLinkTypes(Links.TradeLink.class, Links.SocialNetworkLink.class);
+    registerLinkTypes(Links.TradeLink.class,
+        Links.SocialNetworkLink.class,
+        Links.DataProviderLink.class);
   }
 
   @Override
@@ -107,12 +111,12 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     Group<SocialNetwork> socialMediaGroup = generateGroup(SocialNetwork.class, 1);
 
-    Group<Market> marketGroup = generateGroup(Market.class, 1,
-        m -> {
-          m.price = marketPrice;
-          m.trueValue = trueValue;
-        });
+    Group<DataProvider> dataProviderGroup = generateGroup(DataProvider.class, 1,
+        d -> d.trueValue = trueValue);
 
+    Group<Market> marketGroup = generateGroup(Market.class, 1, m -> m.price = marketPrice);
+
+    marketGroup.fullyConnected(dataProviderGroup, Links.DataProviderLink.class);
 
     if (numFundamentalTrader > 0) {
       Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
@@ -129,8 +133,9 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
       fundamentalTraderGroup.fullyConnected(marketGroup, Links.TradeLink.class);
       marketGroup.fullyConnected(fundamentalTraderGroup, Links.TradeLink.class);
-    }
 
+      dataProviderGroup.fullyConnected(fundamentalTraderGroup, Links.DataProviderLink.class);
+    }
 
     if (numNoiseTrader > 0) {
       Group<NoiseTrader> noiseTraderGroup = generateGroup(NoiseTrader.class, numNoiseTrader, t -> {
@@ -168,7 +173,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
             t.wealth = t.getPrng().exponential(100000000).sample();
             t.shortDuration = t.getGlobals().shortSellDuration;
             t.type = Type.Coordinated;
-            t.opinion = getGlobals().coordinatedTraderOpinion;;
+            t.opinion = getGlobals().coordinatedTraderOpinion;
             System.out.println("Trader type: " + t.type);
           });
 
@@ -179,16 +184,16 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
       socialMediaGroup.fullyConnected(coordinatedTraderGroup, Links.SocialNetworkLink.class);
     }
 
+    if (numInfluencer > 0) {
+      Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
+          i -> {
+            i.opinion = getGlobals().influencerOpinion; /* try 100 to have a nice uptrend of market price */
+            i.probabilityToShare = 1;
+            System.out.println("elon created");
+          });
 
-    Group<Influencer> influencerGroup = generateGroup(Influencer.class, 1,
-        i -> {
-          i.opinion = getGlobals().influencerOpinion; /* try 100 to have a nice uptrend of market price */
-          i.probabilityToShare = 1;
-          System.out.println("elon created");
-        });
-
-    /* ---------------------- connections ---------------------- */
-    influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+      influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+    }
 
     super.setup();
   }
@@ -197,33 +202,22 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public void step() {
     super.step();
 
-    Sequence subSequenceUpdateMomentumAndParams =
-        Sequence.create(
-            Split.create(
-                MomentumTrader.updateParamsAlpha,
-                MomentumTrader.updateMomentum
-            )
-        );
-
     Sequence subSequencePrice =
         Sequence.create(
             Market.sendPriceToTraders,
             Split.create(
-                subSequenceUpdateMomentumAndParams,
+                MomentumTrader.updateMomentum,
                 Trader.submitLimitOrders
             ),
-
-            Split.create(
-                Market.calcPriceImpact,
-                Market.updateTrueValue
-            )
+            Market.calcPriceImpact,
+            DataProvider.updateTrueValue
         );
 
     Sequence subSequenceOpinion =
         Sequence.create(
             Split.create(
                 MomentumTrader.shareOpinion,
-                Influencer.shareOpinion
+                CoordinatedTrader.shareOpinion
             ),
             SocialNetwork.publishOpinions,
             MomentumTrader.fetchAndAdjustOpinion

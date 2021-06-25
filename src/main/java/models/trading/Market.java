@@ -6,37 +6,27 @@ import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 import simudyne.core.graph.Message.Integer;
 
+/* market only knows the market prices, its demand and supply */
 public class Market extends Agent<TradingModel.Globals> {
 
   @Variable
   public float price;
 
-  @Variable
-  public double trueValue;
-
-  private double netDemand;
-
   private long tick = 0L;
 
   /* --------- function definitions --------- */
-
   private static Action<Market> action(SerializableConsumer<Market> consumer) {
     return Action.create(Market.class, consumer);
   }
 
   public static Action<Market> sendPriceToTraders =
-      action(m -> {
-        m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
-        m.getLinks(Links.TradeLink.class).send(Messages.Tick.class, ++m.tick);
-      });
-
+      action(m -> m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price));
 
   public static Action<Market> calcPriceImpact =
       action(
           m -> {
-            System.out.println("hello");
 
-            // get total amount of buys and sells shares for all agents
+            // get total amount of buys and sells shares from all traders
             int buys = m.getMessagesOfType(Messages.BuyOrderPlaced.class)
                 .stream().mapToInt(Integer::getBody).sum();
             int sells = m.getMessagesOfType(Messages.SellOrderPlaced.class)
@@ -53,8 +43,6 @@ public class Market extends Agent<TradingModel.Globals> {
 
             double netDemand = buys - sells;
             System.out.println("Net demand: " + netDemand);
-            m.netDemand = netDemand;
-            System.out.println("Accumulated net demand: " + m.netDemand);
 
             if (netDemand != 0) {
               double lambda = m.getGlobals().lambda;
@@ -65,7 +53,10 @@ public class Market extends Agent<TradingModel.Globals> {
             }
 
             m.getDoubleAccumulator("price").add(m.price);
+            ++m.tick;
             System.out.println("Time step: " + m.tick + "\n");
+
+            m.getLinks(Links.DataProviderLink.class).send(Messages.NetDemand.class, netDemand);
 
             /* check if marketShock is triggered */
 //            if (m.tick == 50) {
@@ -74,49 +65,8 @@ public class Market extends Agent<TradingModel.Globals> {
 //            }
 
           });
-
-  /* update true value V(t) - random walk: */
-  public static Action<Market> updateTrueValue =
-      action(
-          m -> {
-            /*
-               sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j may be == s_v
-               sd_j = 1, lambda = 2
-            */
-            double jumpDiffusionProcess =
-                m.getPrng().normal(0, MarketParams.jumpDiffusionStdDev).sample()
-                    * m.getPrng().poisson(MarketParams.jumpDiffusionPoissonLambda).sample();
-            System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
-
-            /* Random walk
-               V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process
-                    = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i)
-            */
-            System.out.println("prev True value: " + m.trueValue);
-
-            double dv_exo =
-                m.getPrng().normal(0, m.getGlobals().stdDev).sample() + jumpDiffusionProcess;
-
-
-            // kyle_lambda = 2/3 * m.getGlobals().lambda
-
-//            double dv_endo = m.getGlobals().lambda * 2 / 3 * m.accumulatedNetDemand;
-            double dv_endo = m.netDemand * m.getGlobals().lambda * 2 / 3 ;
-            System.out.println("Market signal: " + dv_endo);
-
-            m.trueValue = m.trueValue + dv_exo + dv_endo;
-            m.trueValue = m.trueValue < 0 ? 0 : m.trueValue;
-
-//            m.trueValue = m.trueValue + marketSignal;
-            System.out.println("New True value: " + m.trueValue);
-            m.getLinks(Links.TradeLink.class).send(Messages.TrueValue.class, m.trueValue);
-
-//
-//            double trueValue = m.trueValue + marketSignal;
-//            System.out.println("New True value: " + trueValue);
-//            m.getLinks(Links.TradeLink.class).send(Messages.TrueValue.class, trueValue);
-
-          });
-
-
 }
+
+/* market price will collapse: true value drops
+
+  liquidate: trader holds instead of keep buying more */

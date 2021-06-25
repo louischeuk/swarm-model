@@ -88,11 +88,11 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   protected abstract Side getSide();
 
-  protected abstract int getVolume();
+  protected int getVolume() { return 1; }
 
   protected void hold() {
     buy(0);
-    System.out.println("Trader " + getID() + " holds");
+//    System.out.println("Trader " + getID() + " holds");
   }
 
   protected void handleWhenBuyShares(int sharesToBuy) {
@@ -165,7 +165,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   protected void handleDuringShortSelling() {
     if (isMarginCallTriggered() && !hasEnoughWealthToMaintainMarginAccount()) {
       forceLiquidateShortPosition();
-      System.out.println("Oh shit forced to liquidate!");
+      System.out.println("Oh shit being forced to liquidate!");
     }
 
     if (timeSinceShort++ > shortDuration) {

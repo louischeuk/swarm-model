@@ -18,7 +18,7 @@ public class SocialNetwork extends Agent<TradingModel.Globals> {
   public static Action<SocialNetwork> publishOpinions =
       action(
           s -> {
-            s.publishInfluencerOpinion();
+//            s.publishInfluencerOpinion();
             s.publishTradersOpinions();
           });
 
@@ -35,7 +35,7 @@ public class SocialNetwork extends Agent<TradingModel.Globals> {
     }
   }
 
-  /* handle opinions from trader agent */
+  /* handle opinions from trader agents */
   private void publishTradersOpinions() {
     double[] opinionsListRaw = getMessagesOfType(TraderOpinionShared.class).stream()
         .mapToDouble(Double::getBody).toArray();

@@ -26,8 +26,6 @@ public class MomentumTrader extends Trader {
   protected double getAlpha() {
     System.out.println("********* momentum trader strategy *********");
     System.out.println("Trader id: " + getID());
-    System.out.println("alpha: " + MtParams.alpha);
-
     return MtParams.beta * getDemand();
   }
 
@@ -40,10 +38,6 @@ public class MomentumTrader extends Trader {
     System.out.println("momentum: " + momentum);
     return momentum > 0 ? Side.BUY : Side.SELL;
   }
-
-  @Override
-  protected int getVolume() { return 1; }
-
 
   public static Action<MomentumTrader> updateMomentum =
       action(
@@ -60,18 +54,6 @@ public class MomentumTrader extends Trader {
           }
       );
 
-  /* update mtParams.alpha = (t-1)/t */
-  public static Action<MomentumTrader> updateParamsAlpha =
-      action(
-          t -> {
-            long tick = t.getMessageOfType(Messages.Tick.class).getBody();
-            if (tick != 0) {
-//              mtParams.alpha.val = (double) (tick - 1) / tick;
-//              MtParams.alpha = (double) (tick - 1) / tick;
-
-            }
-          }
-      );
 
   /* share opinion to the social network */
   public static Action<MomentumTrader> shareOpinion =
@@ -87,7 +69,7 @@ public class MomentumTrader extends Trader {
           t -> {
             System.out.println("Trader ID " + t.getID() + " received opinion");
 //            t.adjustOpinionWithInfluencerOpinion();
-//            t.adjustOpinionWithTradersOpinions();
+            t.adjustOpinionWithTradersOpinions();
           });
 
   /* take opinion from other trader agents */
@@ -100,26 +82,41 @@ public class MomentumTrader extends Trader {
         filter(o -> Math.abs(o - opinion) < getGlobals().vicinityRange).count();
     System.out.println(count + " opinions out of " + opinionsList.size() + " opinions considered");
 
-    // take account of momentum ****!!!!!!!!!!!!!!!
-    opinionsList.stream()
-        .filter(o -> Math.abs(o - opinion) < getGlobals().vicinityRange)
-        .forEach(o -> opinion += (o - opinion) * getGlobals().gamma);
+    for (Double o : opinionsList) {
+      if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
+        if (isSameSign(o) || // same direction
+            (!isSameSign(o) && (Math.abs(o - momentum) < getGlobals().vicinityRange))) {
+          opinion += (o - opinion) * getGlobals().gamma;
+        }
+      }
+    }
+  }
 
-    /* dynamics confidence factor */
-    // it doesnt work well because the opinions considered are still close to the self opinion,
-    // so it converges super quickly
+  /* dynamics confidence factor */
+  // it doesnt work well because the opinions considered are still close to the self opinion,
+  // so it converges super quickly
 //        double gamma = 1 / (Math.abs(o - opinion) + 1);
 //        double beta = 1 - gamma;
 //        /* opinion = opinion * selfConfidence + otherOpinion * ConfidenceToOther */
 //        opinion = opinion * beta + o * gamma;
 
+  private boolean isSameSign(Double o) {
+    return (o > 0 && momentum > 0) || (o < 0 && momentum < 0);
   }
 
 
+
   /*
+    take account of momentum ****!!!!!!!!!!!!!!!
     opinion + and market goes up --> belief
-    opinion + but market goes own --> try not to belief
+    opinion + but market goes own --> tend not to belief
+
+    eg.
+    a) momentum: 5, other opinion: 2 --> must belief
+    b) momentum: 1, other opinion: 2 --> still belief
+    c) momentum: -1, other opinion: 2 --> not belief
   */
+
 
   /* take opinion from influencer */
   public void adjustOpinionWithInfluencerOpinion() {

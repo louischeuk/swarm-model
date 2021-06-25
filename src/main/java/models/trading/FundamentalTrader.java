@@ -29,9 +29,6 @@ public class FundamentalTrader extends Trader {
   }
 
   @Override
-  protected int getVolume() { return 1; }
-
-  @Override
   protected Side getSide() {
     return priceDistortion > 0 ? Side.BUY : Side.SELL;
   }
@@ -49,6 +46,8 @@ public class FundamentalTrader extends Trader {
   public static Action<FundamentalTrader> adjustIntrinsicValue =
       action(
           t -> {
+
+            System.out.println("adjust intrinsic value");
             if (t.hasMessageOfType(Messages.MarketShock.class)) {
               System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
             }

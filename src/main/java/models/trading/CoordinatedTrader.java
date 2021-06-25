@@ -1,12 +1,19 @@
 package models.trading;
 
+import models.trading.Links.SocialNetworkLink;
+import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
+import simudyne.core.functions.SerializableConsumer;
 
 /* group of traders that keep buying and strong holding */
 public class CoordinatedTrader extends Trader {
 
   @Variable
   public double opinion;
+
+  private static Action<CoordinatedTrader> action(SerializableConsumer<CoordinatedTrader> consumer) {
+    return Action.create(CoordinatedTrader.class, consumer);
+  }
 
   @Override
   protected double getAlpha() {
@@ -18,16 +25,14 @@ public class CoordinatedTrader extends Trader {
   @Override
   protected Side getSide() { return opinion > 0 ? Side.BUY : Side.SELL; }
 
-  @Override
-  protected int getVolume() {
-//    int volume = (int) Math.abs(getPrng().normal(0, getGlobals().stdDev).sample());
-//    System.out.println("Volume: " + volume);
-//    return volume;
-    return 1;
-  }
 
-  // share opinion
-  // change opinion?
+  /* share opinion to the social network */
+  public static Action<CoordinatedTrader> shareOpinion =
+      action(
+          t -> {
+            t.getLinks(SocialNetworkLink.class).send(Messages.TraderOpinionShared.class, t.opinion);
+            System.out.println("Trader " + t.getID() + " sent opinion");
+          });
 
 
   /*

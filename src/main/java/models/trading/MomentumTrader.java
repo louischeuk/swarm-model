@@ -14,9 +14,11 @@ public class MomentumTrader extends Trader {
   public double opinion;
 
   @Variable
-  public double momentum = 0.0;
+  public double momentum = 0.075; // !!!!!!!! should be 0.0 for real
 
-  float lastMarketPrice = 0.0F;
+  float lastMarketPrice = 5.0F; // !!!!!!!!!! should be 0 for real
+
+  boolean isOpinionOn = false;
 
   private static Action<MomentumTrader> action(SerializableConsumer<MomentumTrader> consumer) {
     return Action.create(MomentumTrader.class, consumer);
@@ -26,11 +28,24 @@ public class MomentumTrader extends Trader {
   protected double getAlpha() {
     System.out.println("********* momentum trader strategy *********");
     System.out.println("Trader id: " + getID());
-    return MtParams.beta * getDemand();
+//    return getGlobals().mtParams_beta * getDemand();
+    return 1;
   }
 
   private double getDemand() {
-    return Math.tanh(Math.abs(momentum + opinion) * MtParams.gamma);
+    double demand;
+//    if (isOpinionOn) {
+//      demand = Math.tanh(Math.abs(momentum + opinion) * getGlobals().mtParams_gamma);
+//    } else {
+      demand = Math.tanh(Math.abs(momentum) * getGlobals().mtParams_gamma);
+//    }
+    getDoubleAccumulator("MtDemand").add(demand);
+    return demand;
+  }
+
+  @Override
+  protected double getVolume() { // change it to double
+    return 1 * (getGlobals().mtParams_beta / getGlobals().numMomentumTrader * getDemand());
   }
 
   @Override
@@ -45,12 +60,10 @@ public class MomentumTrader extends Trader {
             float price = t.getMessageOfType(Messages.MarketPrice.class).getBody();
             if (t.lastMarketPrice != 0) {
               t.momentum =
-                  MtParams.alpha * (price - t.lastMarketPrice)
-                      + (1.0 - MtParams.alpha) * t.momentum;
-              System.out.println("New momentum: " + t.momentum);
+                  t.getGlobals().mtParams_alpha * (price - t.lastMarketPrice)
+                      + (1.0 - t.getGlobals().mtParams_alpha) * t.momentum;
             }
             t.lastMarketPrice = price;
-            System.out.println("last market price " + t.lastMarketPrice);
           }
       );
 
@@ -77,19 +90,17 @@ public class MomentumTrader extends Trader {
 
     List<Double> opinionsList = getMessageOfType(SocialNetworkOpinion.class).opinionList;
     getDoubleAccumulator("opinions").add(opinion);
-
-    double count = opinionsList.stream().
-        filter(o -> Math.abs(o - opinion) < getGlobals().vicinityRange).count();
-    System.out.println(count + " opinions out of " + opinionsList.size() + " opinions considered");
-
+    
+    int count = 0;
     for (Double o : opinionsList) {
       if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
-        if (isSameSign(o) || // same direction
-            (!isSameSign(o) && (Math.abs(o - momentum) < getGlobals().vicinityRange))) {
+        if (isSameSign(o) || (Math.abs(o - momentum) < (getGlobals().vicinityRange + 0.5))) {
           opinion += (o - opinion) * getGlobals().gamma;
+          count++;
         }
       }
     }
+    System.out.println(count + " opinions out of " + opinionsList.size() + " opinions considered");
   }
 
   /* dynamics confidence factor */
@@ -103,8 +114,6 @@ public class MomentumTrader extends Trader {
   private boolean isSameSign(Double o) {
     return (o > 0 && momentum > 0) || (o < 0 && momentum < 0);
   }
-
-
 
   /*
     take account of momentum ****!!!!!!!!!!!!!!!

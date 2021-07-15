@@ -6,13 +6,13 @@ import simudyne.core.graph.Message;
 
 public class Messages {
 
-  public static class BuyOrderPlaced extends Message.Integer {}
+  public static class BuyOrderPlaced extends Message.Double {}
 
-  public static class SellOrderPlaced extends Message.Integer {}
+  public static class SellOrderPlaced extends Message.Double {}
 
-  public static class ShortSellOrderPlaced extends Message.Integer {}
+  public static class ShortSellOrderPlaced extends Message.Double {}
 
-  public static class CloseShortPosOrderPlaced extends Message.Integer {}
+  public static class CloseShortPosOrderPlaced extends Message.Double {}
 
   public static class MarketPrice extends Message.Float {}
 
@@ -27,8 +27,6 @@ public class Messages {
   public static class InfluencerSocialNetworkOpinion extends Message.Double {}
 
   public static class TrueValue extends Message.Double {}
-
-  public static class Tick extends Message.Long {}
 
   public static class HistoricalPrices extends Message {
     HashMap<java.lang.Long, java.lang.Double> historicalPrices;

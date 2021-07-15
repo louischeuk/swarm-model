@@ -10,7 +10,9 @@ public class FundamentalTrader extends Trader {
 
   @Variable
   public double intrinsicValue;
+
   private double priceDistortion;
+
   double zScore;
 
   /* ------------------ functions definition -------------------------*/
@@ -25,7 +27,16 @@ public class FundamentalTrader extends Trader {
     System.out.println("-------------- fundamental trader strategy --------------");
     System.out.println("Trader id: " + getID());
 
-    return Math.abs(getPriceDistortion()) * getGlobals().sensitivity;
+//    return getGlobals().ftParam_kappa * Math.abs(getPriceDistortion());
+//    return (getGlobals().ftParam_kappa / 100) * Math.abs(getPriceDistortion());
+
+    return 1;
+  }
+
+  @Override
+  protected double getVolume() { // change it to double
+    return (1 * (getGlobals().ftParam_kappa / getGlobals().numFundamentalTrader)
+            * Math.abs(getPriceDistortion()));
   }
 
   @Override
@@ -46,17 +57,13 @@ public class FundamentalTrader extends Trader {
   public static Action<FundamentalTrader> adjustIntrinsicValue =
       action(
           t -> {
-
-            System.out.println("adjust intrinsic value");
             if (t.hasMessageOfType(Messages.MarketShock.class)) {
               System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
             }
 
             double trueValue = t.getMessageOfType(Messages.TrueValue.class).getBody();
-//            System.out.println("Trader " + t.getID() + " prev intrinsic value: " + t.intrinsicValue);
-            t.intrinsicValue = t.zScore * t.getGlobals().stdDev + trueValue;
+            t.intrinsicValue = t.zScore * t.getGlobals().sigma_u + trueValue;
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
-//            System.out.println("Trader " + t.getID() + " new intrinsic value: " + t.intrinsicValue);
           });
 
 

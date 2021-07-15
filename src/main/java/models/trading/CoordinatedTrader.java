@@ -19,7 +19,12 @@ public class CoordinatedTrader extends Trader {
   protected double getAlpha() {
     System.out.println("$$$$$$$$$$$ coordinated trader strategy $$$$$$$$$$$$$");
     System.out.println("Trader id: " + getID());
-    return getGlobals().probabilityCoordinatedTrade;
+    return getGlobals().pCoordinatedTrade;
+  }
+
+  @Override
+  protected double getVolume() { // change it to double
+    return 1;
   }
 
   @Override
@@ -40,7 +45,9 @@ public class CoordinatedTrader extends Trader {
 
     1. overvalue --> market-re-adjust (gradually) due to momentum trader and social network
     2. liquidity of the market --> more liquid <-> more change in market price
-    3.
+    3. limited wealth --> buy volume decreases
+
+    4. run of the money (wealth only applies to the coordinates trader)
 
 
    */

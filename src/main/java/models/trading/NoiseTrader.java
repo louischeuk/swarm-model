@@ -7,13 +7,18 @@ public class NoiseTrader extends Trader {
   protected double getAlpha() {
     System.out.println("^^^^^^^^^ noise trader strategy ^^^^^^^^^");
     System.out.println("Trader id: " + getID());
-    return getGlobals().probabilityNoiseTrade;
+    return getGlobals().pNoiseTrade;
   }
 
   @Override
   protected Side getSide() { // 50% sell, 50% buy
     double p = getPrng().uniform(0, 1).sample();
     return p > 0.5 ? Side.BUY : Side.SELL;
+  }
+
+  @Override
+  protected double getVolume() { // change it to double
+    return 1 * getGlobals().sigma_n;
   }
 
 }

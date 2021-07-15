@@ -12,8 +12,8 @@ public class DataProvider extends Agent<Globals> {
   @Variable
   public double trueValue;
 
-  @Variable
-  public double accumulatedNetDemand = 0;
+  private double accumulatedNetDemand = 0;
+  private long tick = 0L;
 
   /* --------- function definitions --------- */
   private static Action<DataProvider> action(SerializableConsumer<DataProvider> consumer) {
@@ -24,41 +24,43 @@ public class DataProvider extends Agent<Globals> {
   public static Action<DataProvider> updateTrueValue =
       action(
           d -> {
+            d.getDoubleAccumulator("equilibrium").add(d.trueValue);
+
+            ++d.tick;
+            System.out.println("Time step: " + d.tick + "\n");
             System.out.println("This is Bloomberg");
 
             double netDemand = d.getMessageOfType(Messages.NetDemand.class).getBody();
             d.accumulatedNetDemand += netDemand;
 
-            /*
-               sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)
-               Note. s_j maybe == s_v.
-               sd_j = 1, lambda = 2
-            */
+            /* sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j maybe == s_v. */
             double jumpDiffusionProcess =
-                d.getPrng().normal(0, MarketParams.jumpDiffusionStdDev).sample()
-                    * d.getPrng().poisson(MarketParams.jumpDiffusionPoissonLambda).sample();
+                d.getPrng().normal(0, d.getGlobals().sigma_jd).sample()
+                    * d.getPrng().poisson(d.getGlobals().lambda_jd).sample();
             System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
 
-            /*
-               new True value = prev true value + random walk (dv_exo) + market signal (dv_endo)
-               V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process
-                    = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i)
-            */
-            System.out.println("prev True value: " + d.trueValue);
-
+            // how the random walk changes
             double dv_exo =
-                d.getPrng().normal(0, d.getGlobals().stdDev).sample() + jumpDiffusionProcess;
+                d.getPrng().normal(0,1).sample() * d.getGlobals().sigma_v + jumpDiffusionProcess;
 
             double kyle_lambda = d.getGlobals().lambda * 2 / 3;
             double dv_endo = kyle_lambda * netDemand;
             System.out.println("Market signal: " + dv_endo);
 
-//            m.trueValue = m.trueValue + dv_exo + dv_endo;
-//            m.trueValue = m.trueValue < 0 ? 0 : m.trueValue;
+           /*
+               new True value = prev true value + random walk (dv_exo) + market signal (dv_endo)
+               V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process + market signal
+                    = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i) + market signal
+            */
+//            d.trueValue = d.trueValue + dv_exo + dv_endo;
+//            d.trueValue = d.trueValue < 0 ? 0 : d.trueValue;
+
+//            if (d.tick == 60 ) {
+//              // market re-adjustment
+//              d.trueValue = 10;
+//            }
 
             System.out.println("New True value: " + d.trueValue);
             d.getLinks(Links.DataProviderLink.class).send(Messages.TrueValue.class, d.trueValue);
-
-//            System.out.println("New True value: " + trueValue);
           });
 }

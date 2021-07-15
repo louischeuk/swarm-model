@@ -31,7 +31,7 @@ public class EMATrader extends Trader {
   }
 
   @Override
-  protected int getVolume() {
+  protected double getVolume() {
     return 0;
   }
 

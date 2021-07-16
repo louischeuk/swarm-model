@@ -27,7 +27,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   public double wealth;
 
   @Variable
-  public int shares = 0;
+  public double shares = 0;
 
   int timeSinceShort = -1;
 
@@ -61,7 +61,6 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
               if (p < alpha) {
                 Side side = t.getSide();
                 double volume = t.getVolume();
-                System.out.println("volume:" + volume);
                 switch (side) {
                   case BUY:
                     t.handleWhenBuyShares(volume);
@@ -77,7 +76,6 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
               if (t.timeSinceShort > -1) { // short selling
                 t.handleDuringShortSelling();
-                System.out.println("you are short selling");
               }
 
             } else {
@@ -96,23 +94,38 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     buy(0);
   }
 
-  protected void handleWhenBuyShares(double sharesToBuy) {
+  protected void handleWhenBuyShares(double volume) {
 
-    if (hasEnoughWealth(getMarketPrice() * sharesToBuy)) {
-      buy(sharesToBuy);
+    if (hasEnoughWealth(getMarketPrice() * volume)) {
+
+      if (shares >= 0) {
+        buy(volume);
+      } else {
+        if (shares + volume <= 0) { // volume < current short sell positions
+          closeShortPos(volume);
+        } else if (shares + volume > 0){ // volume > current short sell positions
+          double vol = shares + volume;
+          closeShortPos(Math.abs(shares));
+          buy(vol);
+        }
+      }
 
       if (shares < 0) {
-        updateMarginAccount(Math.abs(shares) - sharesToBuy);
+        updateMarginAccount(Math.abs(shares) - volume);
       } else {
         if (timeSinceShort > -1) {
           resetMarginAccount(); // cover all the shorts position
         }
       }
 
+      if (wealth < 0) {
+        System.out.println("wealth drops below -ve: you broke!");
+        isBroke = true;
+      }
+
     } else {
       System.out.println("Not enough money");
       noMoneyToTrade();
-//      getLinks(TradeLink.class).send(Messages.BuyOrderPlaced.class, 0);
     }
   }
 
@@ -120,27 +133,28 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     hold();
   }
 
-  protected double getMarketPrice() {
+  protected float getMarketPrice() {
     return getMessageOfType(Messages.MarketPrice.class).getBody();
   }
 
-  protected void handleWhenSellShares(double sharesToSell) {
-    if (hasEnoughShares(sharesToSell)) {
-      sell(sharesToSell);
+  protected void handleWhenSellShares(double volume) {
+    if (hasEnoughShares(volume)) {
+      sell(volume);
     } else {
-      handleNotEnoughSharesToSell(sharesToSell);
+      handleNotEnoughSharesToSell(volume);
     }
   }
 
   protected void handleNotEnoughSharesToSell(double sharesToSell) {
-    if (shares > 0) { // partly sell and partly short-sell
-      sell(shares);
-      if (isShortSellAllowed(sharesToSell - shares)) {
-        shortSell(sharesToSell - shares);
-      }
-    } else {
+    if (shares <= 0) {
       if (isShortSellAllowed(sharesToSell)) {
         shortSell(sharesToSell);
+      }
+    } else if (shares > 0) {
+      double vol = sharesToSell - shares;
+      sell(shares);
+      if (isShortSellAllowed(vol)) {
+        shortSell(vol);
       }
     }
   }
@@ -177,7 +191,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     }
 
     if (timeSinceShort++ > shortDuration) {
-      closeShortPosition(Math.abs(shares));
+      closeShortPos(Math.abs(shares));
     }
   }
 
@@ -188,41 +202,33 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   protected void forceCloseShortPos() {
-    closeShortPosition(Math.abs(shares));
+    closeShortPos(Math.abs(shares));
   }
 
-  protected void closeShortPosition(double sharesToCover) {
+  protected void closeShortPos(double volume) {
 
-    buy(sharesToCover);
-    resetMarginAccount();
+    System.out.println("Close pos: " + volume);
+    getDoubleAccumulator("closeShorts").add(volume);
+    getLinks(TradeLink.class).send(Messages.CloseShortPosOrderPlaced.class, volume);
 
-    System.out.println("Shorts Position got closed lolll");
+    buy(volume);
 
-    if (wealth < 0) {
-      System.out.println("wealth drops below -ve: you broke!");
-      isBroke = true;
+    if (shares >= 0) {
+      resetMarginAccount();
+      System.out.println("Shorts Position got closed....");
     }
   }
 
-  protected void buy(double amountToBuy) {
-
-    if (amountToBuy != 0) {
-      System.out.println("buy volume: " + amountToBuy);
+  protected void buy(double volume) {
+    if (volume != 0) {
+      System.out.println("buy volume: " + volume);
     }
-
-    if (shares < 0) {
-      getLongAccumulator("closeShorts").add((long) amountToBuy);
-      getLinks(TradeLink.class).send(Messages.CloseShortPosOrderPlaced.class, amountToBuy);
-    }
-
-    getLongAccumulator("buys").add((long) amountToBuy);
-    getLinks(TradeLink.class).send(Messages.BuyOrderPlaced.class, amountToBuy);
+    getDoubleAccumulator("buys").add(volume);
+    getLinks(TradeLink.class).send(Messages.BuyOrderPlaced.class, volume);
 
 //    System.out.println("Previous wealth: " + wealth);
-
-    wealth -= getMarketPrice() * amountToBuy;
-    shares += amountToBuy;
-
+    wealth -= getMarketPrice() * volume;
+    shares += volume;
 //    System.out.println("Current wealth: " + wealth);
 //    System.out.println("Current shares: " + shares);
   }
@@ -243,20 +249,19 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   }
 
-  protected void shortSell(double sharesToShort) {
+  protected void shortSell(double volume) {
     if (shares < 0) {
-      // update margin account with more shorts
-      updateMarginAccount(Math.abs(shares) + sharesToShort);
+      updateMarginAccount(Math.abs(shares) + volume);
     } else {
-      initiateMarginAccount(sharesToShort);
+      initiateMarginAccount(volume);
     }
 
-    getLongAccumulator("shorts").add((long) sharesToShort);
-    getLinks(TradeLink.class).send(Messages.ShortSellOrderPlaced.class, sharesToShort);
+    getDoubleAccumulator("shorts").add(volume);
+    getLinks(TradeLink.class).send(Messages.ShortSellOrderPlaced.class, volume);
 
-    System.out.println("shares of short: " + sharesToShort);
+    System.out.println("shares of short: " + volume);
 
-    sell(sharesToShort);
+    sell(volume);
 
     if (timeSinceShort == -1) {
       timeSinceShort = 0;
@@ -266,33 +271,28 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 //    System.out.println("Num of short sell in process: " + numShortingInProcess);
   }
 
-  protected void updateMarginAccount(double sharesToShort) {
-    marginAccount =
-        sharesToShort * getMarketPrice() * (1 + initialMarginRequirement);
-
+  protected void updateMarginAccount(double volume) {
+    marginAccount = volume * getMarketPrice() * (1 + initialMarginRequirement);
 //    System.out.println("~~~~~~Margin account updated: " + marginAccount);
   }
 
-  protected void sell(double sharesToSell) {
-    System.out.println("sell volume: " + sharesToSell);
-    getLongAccumulator("sells").add((long) sharesToSell);
-    getLinks(TradeLink.class).send(Messages.SellOrderPlaced.class, sharesToSell);
+  protected void sell(double volume) {
+    System.out.println("sell volume: " + volume);
+    getDoubleAccumulator("sells").add(volume);
+    getLinks(TradeLink.class).send(Messages.SellOrderPlaced.class, volume);
 
 //    System.out.println("Previous wealth: " + wealth);
-
-    wealth += getMarketPrice() * sharesToSell;
-    shares -= sharesToSell;
-
+    wealth += getMarketPrice() * volume;
+    shares -= volume;
 //    System.out.println("Current wealth: " + wealth);
 //    System.out.println("Current shares: " + shares);
   }
 
-  protected boolean hasEnoughShares(double amountToSell) {
-    return shares >= amountToSell;
+  protected boolean hasEnoughShares(double volume) {
+    return shares >= volume;
   }
 
   protected boolean hasEnoughWealth(double totalValueOfShares) {
     return wealth >= totalValueOfShares;
   }
 }
-

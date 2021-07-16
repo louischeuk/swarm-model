@@ -55,6 +55,7 @@ public class Exchange extends Agent<TradingModel.Globals> {
               m.price = (m.price + priceChange) < 0 ? 0 : (m.price + priceChange);
             }
 
+            System.out.println("Current market price:" + m.price);
             m.getDoubleAccumulator("price").add(m.price);
             m.getLinks(Links.DataProviderLink.class).send(Messages.NetDemand.class, netDemand);
 

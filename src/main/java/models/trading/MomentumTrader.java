@@ -3,6 +3,7 @@ package models.trading;
 import java.util.List;
 import models.trading.Links.SocialNetworkLink;
 import models.trading.Messages.InfluencerSocialNetworkOpinion;
+import models.trading.Messages.MarketPrice;
 import models.trading.Messages.SocialNetworkOpinion;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
@@ -28,24 +29,23 @@ public class MomentumTrader extends Trader {
   protected double getAlpha() {
     System.out.println("********* momentum trader strategy *********");
     System.out.println("Trader id: " + getID());
-//    return getGlobals().mtParams_beta * getDemand();
     return 1;
   }
 
   private double getDemand() {
     double demand;
-//    if (isOpinionOn) {
-//      demand = Math.tanh(Math.abs(momentum + opinion) * getGlobals().mtParams_gamma);
-//    } else {
-      demand = Math.tanh(Math.abs(momentum) * getGlobals().mtParams_gamma);
-//    }
+    if (isOpinionOn) {
+      demand = Math.tanh(Math.abs(momentum + opinion) * getGlobals().mtParams_gamma); // isOpinion = true
+    } else {
+      demand = Math.tanh(Math.abs(momentum) * getGlobals().mtParams_gamma); // isOpinion = false
+    }
     getDoubleAccumulator("MtDemand").add(demand);
     return demand;
   }
 
   @Override
-  protected double getVolume() { // change it to double
-    return 1 * (getGlobals().mtParams_beta / getGlobals().numMomentumTrader * getDemand());
+  protected double getVolume() {
+    return (getGlobals().mtParams_beta / getGlobals().numMomentumTrader) * getDemand();
   }
 
   @Override
@@ -57,7 +57,7 @@ public class MomentumTrader extends Trader {
   public static Action<MomentumTrader> updateMomentum =
       action(
           t -> {
-            float price = t.getMessageOfType(Messages.MarketPrice.class).getBody();
+            float price = t.getMarketPrice();
             if (t.lastMarketPrice != 0) {
               t.momentum =
                   t.getGlobals().mtParams_alpha * (price - t.lastMarketPrice)

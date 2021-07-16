@@ -24,7 +24,7 @@ public class CoordinatedTrader extends Trader {
 
   @Override
   protected double getVolume() { // change it to double
-    return 1;
+    return getGlobals().sigma_ct / getGlobals().numCoordinatedTrader;
   }
 
   @Override

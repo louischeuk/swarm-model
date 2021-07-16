@@ -1,6 +1,5 @@
 package models.trading;
 
-import models.trading.Messages.MarketPrice;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
@@ -26,17 +25,13 @@ public class FundamentalTrader extends Trader {
   protected double getAlpha() {
     System.out.println("-------------- fundamental trader strategy --------------");
     System.out.println("Trader id: " + getID());
-
-//    return getGlobals().ftParam_kappa * Math.abs(getPriceDistortion());
-//    return (getGlobals().ftParam_kappa / 100) * Math.abs(getPriceDistortion());
-
     return 1;
   }
 
   @Override
   protected double getVolume() { // change it to double
-    return (1 * (getGlobals().ftParam_kappa / getGlobals().numFundamentalTrader)
-            * Math.abs(getPriceDistortion()));
+    return (getGlobals().ftParam_kappa / getGlobals().numFundamentalTrader)
+        * Math.abs(getPriceDistortion());
   }
 
   @Override
@@ -45,11 +40,8 @@ public class FundamentalTrader extends Trader {
   }
 
   private double getPriceDistortion() {
-    float price = getMessageOfType(MarketPrice.class).getBody();
     System.out.println("Intrinsic: " + intrinsicValue);
-    System.out.println("Market price: " + price);
-
-    priceDistortion = intrinsicValue - price;
+    priceDistortion = intrinsicValue - getMarketPrice();
     return priceDistortion;
   }
 

@@ -6,7 +6,6 @@ import simudyne.core.abm.GlobalState;
 import simudyne.core.abm.Group;
 import simudyne.core.abm.Sequence;
 import simudyne.core.abm.Split;
-import simudyne.core.annotations.Constant;
 import simudyne.core.annotations.Input;
 import simudyne.core.annotations.ModelSettings;
 
@@ -21,19 +20,19 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
   public static final class Globals extends GlobalState {
 
-    @Constant(name = "Number of FT Traders")
-    public int numFundamentalTrader = 100;
+    @Input(name = "Number of FT Traders")
+    public int numFundamentalTrader = 2;
 
-    @Constant(name = "Number of Noise Traders")
+    @Input(name = "Number of Noise Traders")
     public int numNoiseTrader = 0;
 
-    @Constant(name = "Number of Momentum Traders")
-    public int numMomentumTrader = 100;
+    @Input(name = "Number of Momentum Traders")
+    public int numMomentumTrader = 2;
 
-    @Constant(name = "Number of Coordinated Traders")
+    @Input(name = "Number of Coordinated Traders")
     public int numCoordinatedTrader = 0;
 
-    @Constant(name = "Number of influencers")
+    @Input(name = "Number of influencers")
     public int numInfluencer = 0;
 
     /* aka price elasticity. speed at which the market price converges market equilibrium */
@@ -45,16 +44,20 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     /* for market true value */
     @Input(name = "Standard deviation of random walk")
-    public double sigma_v = 0;
+    public double sigma_v = 0.075;
 
     @Input(name = "Std. dev. of Jump Diffusion")
-    public double sigma_jd = 2; // 2? 3?
+    public double sigma_jd = 0.01; // 2? 3?
 
     @Input(name = "Jump Diffusion's Lambda")
-    public double lambda_jd = 5; // 1? 3?
+    public double lambda_jd = 3; // 1? 3?
 
     @Input(name = "Demand of noise traders")
     public double sigma_n = 0.15; // 1? 3?
+
+    /* for market true value */
+    @Input(name = "standard deviation of CT")
+    public double sigma_ct = 0.15;
 
     @Input(name = "Sensitivity to market")
     public double ftParam_kappa = 0.08; // aka. sensitivity (0.5 before)
@@ -93,7 +96,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double influencerOpinion = 3;
 
     @Input(name = "Opinion of Coordinated T")
-    public double ctOpinion = 3;
+    public double ctOpinion = 5;
 
     /* 0-1, larger number means a higher probability to trade in step */
     @Input(name = "Probability of noise trade")
@@ -107,10 +110,10 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   /* ------------------- model initialisation -------------------*/
   @Override
   public void init() {
-    createLongAccumulator("buys", "Number of buy orders");
-    createLongAccumulator("sells", "Number of sell orders");
-    createLongAccumulator("shorts", "Number of short sell orders");           /* inclusive */
-    createLongAccumulator("closeShorts", "Number of short position covered"); /* inclusive */
+    createDoubleAccumulator("buys", "Number of buy orders");
+    createDoubleAccumulator("sells", "Number of sell orders");
+    createDoubleAccumulator("shorts", "Number of short sell orders");           /* inclusive */
+    createDoubleAccumulator("closeShorts", "Number of short position covered"); /* inclusive */
     createDoubleAccumulator("price", "Market price");
     createDoubleAccumulator("opinions", "Opinions");
     createDoubleAccumulator("equilibrium", "Market equilibrium");
@@ -256,9 +259,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
                 FundamentalTrader.adjustIntrinsicValue
             )
         )
-
     );
-
 
   }
 }

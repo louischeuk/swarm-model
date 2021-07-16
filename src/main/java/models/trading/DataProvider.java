@@ -12,8 +12,12 @@ public class DataProvider extends Agent<Globals> {
   @Variable
   public double trueValue;
 
+  @Variable
+  public double dv_exo;
+
   private double accumulatedNetDemand = 0;
   private long tick = 0L;
+
 
   /* --------- function definitions --------- */
   private static Action<DataProvider> action(SerializableConsumer<DataProvider> consumer) {
@@ -40,8 +44,8 @@ public class DataProvider extends Agent<Globals> {
             System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
 
             // how the random walk changes
-            double dv_exo =
-                d.getPrng().normal(0,1).sample() * d.getGlobals().sigma_v + jumpDiffusionProcess;
+            d.dv_exo =
+                d.getPrng().normal(0, 1).sample() * d.getGlobals().sigma_v + jumpDiffusionProcess;
 
             double kyle_lambda = d.getGlobals().lambda * 2 / 3;
             double dv_endo = kyle_lambda * netDemand;
@@ -52,7 +56,7 @@ public class DataProvider extends Agent<Globals> {
                V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process + market signal
                     = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i) + market signal
             */
-//            d.trueValue = d.trueValue + dv_exo + dv_endo;
+//            d.trueValue = d.trueValue + d.dv_exo + dv_endo;
 //            d.trueValue = d.trueValue < 0 ? 0 : d.trueValue;
 
 //            if (d.tick == 60 ) {

@@ -21,16 +21,16 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
   public static final class Globals extends GlobalState {
 
     @Input(name = "Number of FT Traders")
-    public int numFundamentalTrader = 2;
+    public int numFundamentalTrader = 5;
 
     @Input(name = "Number of Noise Traders")
     public int numNoiseTrader = 0;
 
     @Input(name = "Number of Momentum Traders")
-    public int numMomentumTrader = 2;
+    public int numMomentumTrader = 5;
 
     @Input(name = "Number of Coordinated Traders")
-    public int numCoordinatedTrader = 0;
+    public int numCoordinatedTrader = 5;
 
     @Input(name = "Number of influencers")
     public int numInfluencer = 0;
@@ -47,7 +47,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double sigma_v = 0.075;
 
     @Input(name = "Std. dev. of Jump Diffusion")
-    public double sigma_jd = 0.01; // 2? 3?
+    public double sigma_jd = 1; // 2? 3?
 
     @Input(name = "Jump Diffusion's Lambda")
     public double lambda_jd = 3; // 1? 3?
@@ -79,7 +79,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     /* smaller the value, more clusters formed */
     @Input(name = "vicinity Range")
-    public double vicinityRange = 3; /*
+    public double vicinityRange = 5; /*
                                         2: converge to close to 0
                                         above 2: all converge to 3
                                      */

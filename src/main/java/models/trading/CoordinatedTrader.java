@@ -18,7 +18,6 @@ public class CoordinatedTrader extends Trader {
   @Override
   protected double getAlpha() {
     System.out.println("$$$$$$$$$$$ coordinated trader strategy $$$$$$$$$$$$$");
-    System.out.println("Trader id: " + getID());
     return getGlobals().pCoordinatedTrade;
   }
 
@@ -29,7 +28,6 @@ public class CoordinatedTrader extends Trader {
 
   @Override
   protected Side getSide() { return opinion > 0 ? Side.BUY : Side.SELL; }
-
 
   /* share opinion to the social network */
   public static Action<CoordinatedTrader> shareOpinion =

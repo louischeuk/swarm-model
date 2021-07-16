@@ -15,11 +15,11 @@ public class MomentumTrader extends Trader {
   public double opinion;
 
   @Variable
-  public double momentum = 0.075; // !!!!!!!! should be 0.0 for real
+  public double momentum = 0.0; // !!!!!!!! should be 0.0 for real (0.075 for testing)
 
-  float lastMarketPrice = 5.0F; // !!!!!!!!!! should be 0 for real
+  float lastMarketPrice = 0.0F; // !!!!!!!!!! should be 0 for real ( 5.0f for testing)
 
-  boolean isOpinionOn = false;
+  boolean isOpinionOn = true;
 
   private static Action<MomentumTrader> action(SerializableConsumer<MomentumTrader> consumer) {
     return Action.create(MomentumTrader.class, consumer);
@@ -28,7 +28,6 @@ public class MomentumTrader extends Trader {
   @Override
   protected double getAlpha() {
     System.out.println("********* momentum trader strategy *********");
-    System.out.println("Trader id: " + getID());
     return 1;
   }
 
@@ -58,10 +57,10 @@ public class MomentumTrader extends Trader {
       action(
           t -> {
             float price = t.getMarketPrice();
+            double mtParams_alpha = t.getGlobals().mtParams_alpha;
             if (t.lastMarketPrice != 0) {
-              t.momentum =
-                  t.getGlobals().mtParams_alpha * (price - t.lastMarketPrice)
-                      + (1.0 - t.getGlobals().mtParams_alpha) * t.momentum;
+              t.momentum = mtParams_alpha * (price - t.lastMarketPrice)
+                  + (1.0 - mtParams_alpha) * t.momentum;
             }
             t.lastMarketPrice = price;
           }
@@ -90,7 +89,7 @@ public class MomentumTrader extends Trader {
 
     List<Double> opinionsList = getMessageOfType(SocialNetworkOpinion.class).opinionList;
     getDoubleAccumulator("opinions").add(opinion);
-    
+
     int count = 0;
     for (Double o : opinionsList) {
       if (Math.abs(o - opinion) < getGlobals().vicinityRange) {

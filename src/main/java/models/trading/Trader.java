@@ -55,12 +55,13 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
       action(
           t -> {
             if (!t.isBroke) {
+              System.out.println("Trader id: " + t.getID());
 
               double alpha = t.getAlpha();
               double p = t.getPrng().uniform(0, 1).sample();
               if (p < alpha) {
-                Side side = t.getSide();
                 double volume = t.getVolume();
+                Side side = t.getSide();
                 switch (side) {
                   case BUY:
                     t.handleWhenBuyShares(volume);

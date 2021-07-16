@@ -24,14 +24,14 @@ public class FundamentalTrader extends Trader {
   @Override
   protected double getAlpha() {
     System.out.println("-------------- fundamental trader strategy --------------");
-    System.out.println("Trader id: " + getID());
     return 1;
   }
 
   @Override
   protected double getVolume() { // change it to double
-    return (getGlobals().ftParam_kappa / getGlobals().numFundamentalTrader)
-        * Math.abs(getPriceDistortion());
+    double ftParam_kappa = getGlobals().ftParam_kappa;
+    int numFundamentalTrader = getGlobals().numFundamentalTrader;
+    return (ftParam_kappa / numFundamentalTrader) * Math.abs(getPriceDistortion());
   }
 
   @Override

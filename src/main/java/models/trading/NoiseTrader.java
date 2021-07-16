@@ -6,14 +6,13 @@ public class NoiseTrader extends Trader {
   @Override
   protected double getAlpha() {
     System.out.println("^^^^^^^^^ noise trader strategy ^^^^^^^^^");
-    System.out.println("Trader id: " + getID());
     return getGlobals().pNoiseTrade;
   }
 
   @Override
   protected Side getSide() { // 50% sell, 50% buy
     double p = getPrng().uniform(0, 1).sample();
-    return p > 0.5 ? Side.BUY : Side.SELL;
+    return p >= 0.5 ? Side.BUY : Side.SELL;
   }
 
   @Override

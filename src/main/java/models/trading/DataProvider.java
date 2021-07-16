@@ -18,7 +18,6 @@ public class DataProvider extends Agent<Globals> {
   private double accumulatedNetDemand = 0;
   private long tick = 0L;
 
-
   /* --------- function definitions --------- */
   private static Action<DataProvider> action(SerializableConsumer<DataProvider> consumer) {
     return Action.create(DataProvider.class, consumer);
@@ -38,14 +37,16 @@ public class DataProvider extends Agent<Globals> {
             d.accumulatedNetDemand += netDemand;
 
             /* sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j maybe == s_v. */
+
+            double sigma_jd = d.getGlobals().sigma_jd;
+            double lambda_jd = d.getGlobals().lambda_jd;
             double jumpDiffusionProcess =
-                d.getPrng().normal(0, d.getGlobals().sigma_jd).sample()
-                    * d.getPrng().poisson(d.getGlobals().lambda_jd).sample();
+                d.getPrng().normal(0, sigma_jd).sample() * d.getPrng().poisson(lambda_jd).sample();
             System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
 
             // how the random walk changes
-            d.dv_exo =
-                d.getPrng().normal(0, 1).sample() * d.getGlobals().sigma_v + jumpDiffusionProcess;
+            double sigma_v = d.getGlobals().sigma_v;
+            d.dv_exo = d.getPrng().normal(0, 1).sample() * sigma_v + jumpDiffusionProcess;
 
             double kyle_lambda = d.getGlobals().lambda * 2 / 3;
             double dv_endo = kyle_lambda * netDemand;
@@ -56,8 +57,8 @@ public class DataProvider extends Agent<Globals> {
                V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process + market signal
                     = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i) + market signal
             */
-//            d.trueValue = d.trueValue + d.dv_exo + dv_endo;
-//            d.trueValue = d.trueValue < 0 ? 0 : d.trueValue;
+            d.trueValue = d.trueValue + d.dv_exo + dv_endo;
+            d.trueValue = d.trueValue < 0 ? 0 : d.trueValue;
 
 //            if (d.tick == 60 ) {
 //              // market re-adjustment

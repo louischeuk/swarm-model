@@ -30,7 +30,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public int numMomentumTrader = 5;
 
     @Input(name = "Number of Coordinated Traders")
-    public int numCoordinatedTrader = 2;
+    public int numCoordinatedTrader = 5;
 
     @Input(name = "Number of influencers")
     public int numInfluencer = 0;
@@ -40,7 +40,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double lambda = 0.5; // 0.3?, 0.025
 
     @Input(name = "Uncertainty of true value")
-    public double sigma_u = 5;
+    public double sigma_u = 10;
 
     /* for market true value */
     @Input(name = "Standard deviation of random walk")
@@ -53,29 +53,23 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double lambda_jd = 2; // 1? 3?
 
     @Input(name = "Demand of noise traders")
-    public double sigma_n = 0.15; // 1? 3?
+    public double sigma_n = 1;
 
     /* for market true value */
     @Input(name = "standard deviation of CT")
-    public double sigma_ct = 0.15;
+    public double sigma_ct = 0.5;
 
     @Input(name = "Sensitivity to market")
     public double ftParam_kappa = 0.08; // aka. sensitivity (0.5 before)
 
     @Input(name = "MT Params: alpha")
-    public double mtParams_alpha = 0.2; // or 0.8, 0.9 or 0.5 (to be safe)
+    public double mtParams_alpha = 0.5; // or 0.8, 0.9 or 0.5 (to be safe)
 
     @Input(name = "MT Params: Beta")
-    public double mtParams_beta = 0.1; // 10 before
+    public double mtParams_beta = 0.5; // 10 before, (0.1 in paper)
 
     @Input(name = "MT Params: gamma")
     public double mtParams_gamma = 50;
-
-    @Input(name = "Short selling duration")
-    public int shortSellDuration = 200;
-
-    @Input(name = "Max times of short in process")
-    public int maxShortingInProcess = 200;
 
     /* smaller the value, more clusters formed */
     @Input(name = "vicinity Range")
@@ -93,7 +87,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double k = 10;
 
     @Input(name = "Opinion of influencer")
-    public double influencerOpinion = 3;
+    public double influencerOpinion = 5;
 
     @Input(name = "Opinion of Coordinated T")
     public double ctOpinion = 5;
@@ -105,6 +99,9 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     /* 0-1, larger number means a higher probability to trade in step */
     @Input(name = "Probability of coordinated trade")
     public double pCoordinatedTrade = 1;
+
+    @Input(name = "tick to kick start opinion exchange")
+    public double tickToStartOpinionExchange = 20;
   }
 
   /* ------------------- model initialisation -------------------*/
@@ -148,8 +145,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
           getGlobals().numFundamentalTrader, t -> {
             t.type = Type.Fundamental;
             t.wealth = t.getPrng().exponential(100000000).sample();
-//      t.shortDuration = t.getPrng().generator.nextInt(getGlobals().shortSellDuration) + 1;
-            t.shortDuration = t.getGlobals().shortSellDuration;
             t.zScore = t.getPrng().normal(0, 1).sample();
             t.intrinsicValue = trueValue + t.zScore * getGlobals().sigma_u;
 
@@ -166,7 +161,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
       Group<NoiseTrader> noiseTraderGroup = generateGroup(NoiseTrader.class,
           getGlobals().numNoiseTrader, t -> {
             t.wealth = t.getPrng().exponential(100000000).sample();
-            t.shortDuration = t.getGlobals().shortSellDuration;
             t.type = Type.Noise;
             System.out.println("Trader type: " + t.type);
           });
@@ -179,7 +173,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
       Group<MomentumTrader> momentumTraderGroup = generateGroup(MomentumTrader.class,
           getGlobals().numMomentumTrader, t -> {
             t.wealth = t.getPrng().exponential(100000000).sample();
-            t.shortDuration = t.getGlobals().shortSellDuration;
 
             t.opinion = t.getPrng().normal(0, 1).sample();
             t.type = Type.Momentum;
@@ -197,7 +190,6 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
       Group<CoordinatedTrader> coordinatedTraderGroup = generateGroup(CoordinatedTrader.class,
           getGlobals().numCoordinatedTrader, t -> {
             t.wealth = t.getPrng().exponential(10000000).sample();
-            t.shortDuration = t.getGlobals().shortSellDuration;
             t.type = Type.Coordinated;
             t.opinion = getGlobals().ctOpinion;
             System.out.println("Trader type: " + t.type);
@@ -233,7 +225,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
             Exchange.sendPriceToTraders,
             Split.create(
                 MomentumTrader.updateMomentum,
-                Trader.submitLimitOrders
+                Trader.submitOrders
             ),
             Exchange.calcPriceImpact,
             DataProvider.updateTrueValue

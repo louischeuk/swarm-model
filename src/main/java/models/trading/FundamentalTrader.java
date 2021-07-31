@@ -1,9 +1,5 @@
 package models.trading;
 
-import com.google.errorprone.annotations.Var;
-import java.util.List;
-import models.trading.Links.SocialNetworkLink;
-import models.trading.Messages.SocialNetworkOpinion;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
@@ -15,9 +11,6 @@ public class FundamentalTrader extends Trader {
   public double intrinsicValue;
 
   private double priceDistortion;
-
-//  @Variable
-//  public double opinion;
 
   @Variable
   public double zScore;
@@ -62,49 +55,10 @@ public class FundamentalTrader extends Trader {
             }
 
             double trueValue = t.getMessageOfType(Messages.TrueValue.class).getBody();
-            t.intrinsicValue = (t.zScore) * t.getGlobals().sigma_u + trueValue;
+            t.intrinsicValue = t.zScore * t.getGlobals().sigma_u + trueValue;
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
           });
-
-
-//  /* share opinion to the social network */
-//  public static Action<FundamentalTrader> shareOpinion =
-//      action(
-//          t -> {
-//            t.getLinks(SocialNetworkLink.class).send(Messages.TraderOpinionShared.class, t.opinion);
-//            System.out.println("Trader " + t.getID() + " sent opinion");
-//          });
-//
-//  /* fetch the opinion from social network and update the self opinion accordingly */
-//  public static Action<FundamentalTrader> fetchAndAdjustOpinion =
-//      action(
-//          t -> {
-//            System.out.println("Trader ID " + t.getID() + " received opinion");
-//            t.adjustOpinionWithTradersOpinions();
-//          });
-//
-//  /* take opinion from other trader agents */
-//  public void adjustOpinionWithTradersOpinions() {
-//
-//    List<Double> opinionsList = getMessageOfType(SocialNetworkOpinion.class).opinionList;
-//    getDoubleAccumulator("opinions").add(opinion);
-//
-//    int count = 0;
-//    for (Double o : opinionsList) {
-//      if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
-//          opinion += (o - opinion) * getGlobals().gamma;
-//          count++;
-//        }
-//      }
-//    System.out.println(count + " opinions out of " + opinionsList.size() + " opinions considered");
-//  }
-
 }
-
-
-
-
-
 
 
 // how to push the price of FT intrinsic

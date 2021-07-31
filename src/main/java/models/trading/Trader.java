@@ -10,7 +10,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   public enum Side {BUY, SELL}
 
-  public enum Type {Noise, Fundamental, Momentum, Coordinated, MI, Opinionated}
+  public enum Type {Noise, Fundamental, Momentum, Coordinated}
    /*
    ------- Trader type -------
    Noise trader (uninformed): will randomly buy or sell
@@ -29,17 +29,10 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   @Variable
   public double shares = 0;
 
-  int timeSinceShort = -1;
-
-  // after this shortDuration, you must cover your short positions
-  int shortDuration;
-
-  double marginAccount = 0;
+  @Variable
+  public double marginAccount = 0;
 
   boolean isBroke = false;
-
-  // the total times of transaction of short selling at a moment cannot exceed a int
-  int numShortingInProcess = 0;
 
   static double initialMarginRequirement = 0.5;
 
@@ -51,36 +44,33 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     return Action.create(Trader.class, consumer);
   }
 
-  public static Action<Trader> submitLimitOrders =
+  public static Action<Trader> submitOrders =
       action(
           t -> {
-            if (!t.isBroke) {
-              System.out.println("Trader id: " + t.getID());
 
-              double alpha = t.getAlpha();
-              double p = t.getPrng().uniform(0, 1).sample();
-              if (p < alpha) {
-                double volume = t.getVolume();
-                Side side = t.getSide();
-                switch (side) {
-                  case BUY:
-                    t.handleWhenBuyShares(volume);
-                    break;
-                  case SELL:
-                    t.handleWhenSellShares(volume);
-                    break;
-                }
-              } else {
-                System.out.println("Trader " + t.getID() + " holds");
-                t.hold(); // only uncomment if there are only FT Traders
-              }
+            if (t.isBroke) {
+              System.out.println("this trader is broke!");
+              return;
+            }
 
-              if (t.timeSinceShort > -1) { // short selling
-                t.handleDuringShortSelling();
+            System.out.println("Trader id: " + t.getID());
+            double alpha = t.getAlpha();
+            double p = t.getPrng().uniform(0, 1).sample();
+            if (p < alpha) {
+              double volume = t.getVolume();
+              Side side = t.getSide();
+              switch (side) {
+                case BUY:
+                  t.handleWhenBuyShares(volume);
+                  break;
+                case SELL:
+                  t.handleWhenSellShares(volume);
+                  break;
               }
 
             } else {
-              System.out.println("this trader is broke!");
+              System.out.println("Trader " + t.getID() + " holds");
+              t.hold(); // only uncomment if there are only FT Traders
             }
           }
       );
@@ -91,48 +81,50 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   protected abstract double getVolume();
 
-  protected void hold() {
-    buy(0);
-  }
+  protected void hold() { buy(0); }
 
   protected void handleWhenBuyShares(double volume) {
 
     if (hasEnoughWealth(getMarketPrice() * volume)) {
-
       if (shares >= 0) {
         buy(volume);
+
       } else {
         if (shares + volume <= 0) { // volume < current short sell positions
           closeShortPos(volume);
-        } else if (shares + volume > 0){ // volume > current short sell positions
+
+        } else if (shares + volume > 0) { // volume > current short sell positions
           double vol = shares + volume;
           closeShortPos(Math.abs(shares));
           buy(vol);
         }
       }
 
-      if (shares < 0) {
-        updateMarginAccount(Math.abs(shares) - volume);
-      } else {
-        if (timeSinceShort > -1) {
-          resetMarginAccount(); // cover all the shorts position
-        }
-      }
+      updateTraderStatus();
+      return;
+    }
 
-      if (wealth < 0) {
-        System.out.println("wealth drops below -ve: you broke!");
-        isBroke = true;
-      }
+    System.out.println("Not enough money");
+    noMoneyToTrade();
+  }
 
-    } else {
-      System.out.println("Not enough money");
-      noMoneyToTrade();
+  private void updateTraderStatus() {
+    if (shares < 0) {
+      handleDuringShortSelling();
+    }
+    if (shares < 0) {
+      updateMarginAccount(Math.abs(shares));
+    } else if (shares >= 0) {
+      resetMarginAccount();
+    }
+
+    if (wealth < 0 && shares <= 0) {
+      System.out.println("wealth drops below -ve: you broke!");
+      isBroke = true;
     }
   }
 
-  private void noMoneyToTrade() {
-    hold();
-  }
+  private void noMoneyToTrade() { hold(); }
 
   protected float getMarketPrice() {
     return getMessageOfType(Messages.MarketPrice.class).getBody();
@@ -141,9 +133,9 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   protected void handleWhenSellShares(double volume) {
     if (hasEnoughShares(volume)) {
       sell(volume);
-    } else {
-      handleNotEnoughSharesToSell(volume);
+      return;
     }
+    handleNotEnoughSharesToSell(volume);
   }
 
   protected void handleNotEnoughSharesToSell(double sharesToSell) {
@@ -151,6 +143,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
       if (isShortSellAllowed(sharesToSell)) {
         shortSell(sharesToSell);
       }
+
     } else if (shares > 0) {
       double vol = sharesToSell - shares;
       sell(shares);
@@ -165,10 +158,6 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   }
 
   protected boolean isShortSellAllowed(double sharesToSell) {
-    if (numShortingInProcess >= getGlobals().maxShortingInProcess) {
-      System.out.println("Already shorted " + numShortingInProcess + " times, wait!");
-      return false;
-    }
     return isWealthMeetInitialMarginRequirement(sharesToSell);
   }
 
@@ -188,23 +177,14 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   protected void handleDuringShortSelling() {
     if (isMarginCallTriggered() && !hasEnoughWealthToMaintainMarginAccount()) {
       forceCloseShortPos();
+      System.out.println("shares (should be 0 at the point): " + shares);
       System.out.println("Oh shit being forced to liquidate!");
     }
-
-    if (timeSinceShort++ > shortDuration) {
-      closeShortPos(Math.abs(shares));
-    }
   }
 
-  protected void resetMarginAccount() {
-    marginAccount = 0;
-    timeSinceShort = -1;
-    numShortingInProcess = 0;
-  }
+  protected void resetMarginAccount() { marginAccount = 0; }
 
-  protected void forceCloseShortPos() {
-    closeShortPos(Math.abs(shares));
-  }
+  protected void forceCloseShortPos() { closeShortPos(Math.abs(shares)); }
 
   protected void closeShortPos(double volume) {
 
@@ -236,10 +216,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   protected boolean hasEnoughWealthToMaintainMarginAccount() {
     double totalValueOfShorts = Math.abs(shares) * getMarketPrice();
-    double wealthRequiredInMarginAccount = marginAccount * maintenanceMargin;
-
-    return wealth >= wealthRequiredInMarginAccount - (marginAccount - totalValueOfShorts)
-        && wealth >= wealthRequiredInMarginAccount; // just double check
+    return wealth >= totalValueOfShorts * maintenanceMargin;
   }
 
   protected boolean isMarginCallTriggered() {
@@ -248,6 +225,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     /*
       formula: if (Trader's money / value of all short position) x 100% < maintenance margin,
       then margin call is triggered
+      https://www.youtube.com/watch?v=4GA6WbQvn3I&ab_channel=MarketsKnow-How
     */
   }
 
@@ -264,18 +242,11 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
     System.out.println("shares of short: " + volume);
 
     sell(volume);
-
-    if (timeSinceShort == -1) {
-      timeSinceShort = 0;
-    }
-
-    numShortingInProcess++;
-//    System.out.println("Num of short sell in process: " + numShortingInProcess);
   }
 
   protected void updateMarginAccount(double volume) {
     marginAccount = volume * getMarketPrice() * (1 + initialMarginRequirement);
-//    System.out.println("~~~~~~Margin account updated: " + marginAccount);
+    System.out.println("~~~~~~Margin account updated: " + marginAccount);
   }
 
   protected void sell(double volume) {

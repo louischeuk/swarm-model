@@ -3,7 +3,6 @@ package models.trading;
 import java.util.List;
 import models.trading.Links.SocialNetworkLink;
 import models.trading.Messages.InfluencerSocialNetworkOpinion;
-import models.trading.Messages.MarketPrice;
 import models.trading.Messages.SocialNetworkOpinion;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
@@ -19,7 +18,9 @@ public class MomentumTrader extends Trader {
 
   float lastMarketPrice = 0.0F; //  5.0f for testing
 
-  boolean isOpinionOn = true;
+  boolean isOpinionOn = false;
+
+  int countTick = 0;
 
   private static Action<MomentumTrader> action(SerializableConsumer<MomentumTrader> consumer) {
     return Action.create(MomentumTrader.class, consumer);
@@ -32,6 +33,12 @@ public class MomentumTrader extends Trader {
   }
 
   private double getDemand() {
+
+    if (++countTick == getGlobals().tickToStartOpinionExchange) {
+      isOpinionOn = true;
+      System.out.println("opinion starts to exchange");
+    }
+
     double demand;
     if (isOpinionOn) { // isOpinion = true
       demand = Math.tanh(Math.abs(momentum + opinion) * getGlobals().mtParams_gamma);
@@ -81,15 +88,19 @@ public class MomentumTrader extends Trader {
       action(
           t -> {
             System.out.println("Trader ID " + t.getID() + " received opinion");
-//            t.adjustOpinionWithInfluencerOpinion();
-            t.adjustOpinionWithTradersOpinions();
+
+            if (t.isOpinionOn) {
+              //            t.adjustOpinionWithInfluencerOpinion();
+              t.adjustOpinionWithTradersOpinions();
+            }
+            t.getDoubleAccumulator("opinions").add(t.opinion);
+
           });
 
   /* take opinion from other trader agents */
   public void adjustOpinionWithTradersOpinions() {
 
     List<Double> opinionsList = getMessageOfType(SocialNetworkOpinion.class).opinionList;
-    getDoubleAccumulator("opinions").add(opinion);
 
     int count = 0;
     for (Double o : opinionsList) {

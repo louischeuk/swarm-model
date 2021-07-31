@@ -15,9 +15,9 @@ public class MomentumTrader extends Trader {
   public double opinion;
 
   @Variable
-  public double momentum = 0.0; // !!!!!!!! should be 0.0 for real (0.075 for testing)
+  public double momentum = 0.0; // 0.075 for testing
 
-  float lastMarketPrice = 0.0F; // !!!!!!!!!! should be 0 for real ( 5.0f for testing)
+  float lastMarketPrice = 0.0F; //  5.0f for testing
 
   boolean isOpinionOn = true;
 
@@ -33,10 +33,10 @@ public class MomentumTrader extends Trader {
 
   private double getDemand() {
     double demand;
-    if (isOpinionOn) {
-      demand = Math.tanh(Math.abs(momentum + opinion) * getGlobals().mtParams_gamma); // isOpinion = true
-    } else {
-      demand = Math.tanh(Math.abs(momentum) * getGlobals().mtParams_gamma); // isOpinion = false
+    if (isOpinionOn) { // isOpinion = true
+      demand = Math.tanh(Math.abs(momentum + opinion) * getGlobals().mtParams_gamma);
+    } else { // isOpinion = false
+      demand = Math.tanh(Math.abs(momentum) * getGlobals().mtParams_gamma);
     }
     getDoubleAccumulator("MtDemand").add(demand);
     return demand;
@@ -50,8 +50,9 @@ public class MomentumTrader extends Trader {
   @Override
   protected Side getSide() {
     System.out.println("momentum: " + momentum);
-    return momentum > 0 ? Side.BUY : Side.SELL;
+    return (momentum + opinion) > 0 ? Side.BUY : Side.SELL;
   }
+
 
   public static Action<MomentumTrader> updateMomentum =
       action(
@@ -60,7 +61,7 @@ public class MomentumTrader extends Trader {
             double mtParams_alpha = t.getGlobals().mtParams_alpha;
             if (t.lastMarketPrice != 0) {
               t.momentum = mtParams_alpha * (price - t.lastMarketPrice)
-                  + (1.0 - mtParams_alpha) * t.momentum;
+                      + (1.0 - mtParams_alpha) * t.momentum;
             }
             t.lastMarketPrice = price;
           }

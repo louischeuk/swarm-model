@@ -30,17 +30,17 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public int numMomentumTrader = 5;
 
     @Input(name = "Number of Coordinated Traders")
-    public int numCoordinatedTrader = 5;
+    public int numCoordinatedTrader = 2;
 
     @Input(name = "Number of influencers")
     public int numInfluencer = 0;
 
     /* aka price elasticity. speed at which the market price converges market equilibrium */
     @Input(name = "Exchange's lambda")
-    public double lambda = 1; // 0.3?, 0.025
+    public double lambda = 0.5; // 0.3?, 0.025
 
     @Input(name = "Uncertainty of true value")
-    public double sigma_u = 0;
+    public double sigma_u = 5;
 
     /* for market true value */
     @Input(name = "Standard deviation of random walk")
@@ -50,7 +50,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public double sigma_jd = 1; // 2? 3?
 
     @Input(name = "Jump Diffusion's Lambda")
-    public double lambda_jd = 3; // 1? 3?
+    public double lambda_jd = 2; // 1? 3?
 
     @Input(name = "Demand of noise traders")
     public double sigma_n = 0.15; // 1? 3?

@@ -1,5 +1,9 @@
 package models.trading;
 
+import com.google.errorprone.annotations.Var;
+import java.util.List;
+import models.trading.Links.SocialNetworkLink;
+import models.trading.Messages.SocialNetworkOpinion;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
@@ -12,7 +16,11 @@ public class FundamentalTrader extends Trader {
 
   private double priceDistortion;
 
-  double zScore;
+//  @Variable
+//  public double opinion;
+
+  @Variable
+  public double zScore;
 
   /* ------------------ functions definition -------------------------*/
 
@@ -28,7 +36,7 @@ public class FundamentalTrader extends Trader {
   }
 
   @Override
-  protected double getVolume() { // change it to double
+  protected double getVolume() {
     double ftParam_kappa = getGlobals().ftParam_kappa;
     int numFundamentalTrader = getGlobals().numFundamentalTrader;
     return (ftParam_kappa / numFundamentalTrader) * Math.abs(getPriceDistortion());
@@ -54,10 +62,52 @@ public class FundamentalTrader extends Trader {
             }
 
             double trueValue = t.getMessageOfType(Messages.TrueValue.class).getBody();
-            t.intrinsicValue = t.zScore * t.getGlobals().sigma_u + trueValue;
+            t.intrinsicValue = (t.zScore) * t.getGlobals().sigma_u + trueValue;
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
           });
 
 
+//  /* share opinion to the social network */
+//  public static Action<FundamentalTrader> shareOpinion =
+//      action(
+//          t -> {
+//            t.getLinks(SocialNetworkLink.class).send(Messages.TraderOpinionShared.class, t.opinion);
+//            System.out.println("Trader " + t.getID() + " sent opinion");
+//          });
+//
+//  /* fetch the opinion from social network and update the self opinion accordingly */
+//  public static Action<FundamentalTrader> fetchAndAdjustOpinion =
+//      action(
+//          t -> {
+//            System.out.println("Trader ID " + t.getID() + " received opinion");
+//            t.adjustOpinionWithTradersOpinions();
+//          });
+//
+//  /* take opinion from other trader agents */
+//  public void adjustOpinionWithTradersOpinions() {
+//
+//    List<Double> opinionsList = getMessageOfType(SocialNetworkOpinion.class).opinionList;
+//    getDoubleAccumulator("opinions").add(opinion);
+//
+//    int count = 0;
+//    for (Double o : opinionsList) {
+//      if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
+//          opinion += (o - opinion) * getGlobals().gamma;
+//          count++;
+//        }
+//      }
+//    System.out.println(count + " opinions out of " + opinionsList.size() + " opinions considered");
+//  }
+
 }
+
+
+
+
+
+
+
+// how to push the price of FT intrinsic
+// 1. FT takes opinions in account?
+// 2. sigma_u != 0
 

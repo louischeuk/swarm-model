@@ -37,18 +37,17 @@ public class DataProvider extends Agent<Globals> {
             d.accumulatedNetDemand += netDemand;
 
             /* sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j maybe == s_v. */
-
             double sigma_jd = d.getGlobals().sigma_jd;
             double lambda_jd = d.getGlobals().lambda_jd;
             double jumpDiffusionProcess =
                 d.getPrng().normal(0, sigma_jd).sample() * d.getPrng().poisson(lambda_jd).sample();
-            System.out.println("jumpDiffusionProcess: " + jumpDiffusionProcess);
 
             // how the random walk changes
             double sigma_v = d.getGlobals().sigma_v;
             d.dv_exo = d.getPrng().normal(0, 1).sample() * sigma_v + jumpDiffusionProcess;
+            System.out.println("dv_exo: "+ d.dv_exo);
 
-            double kyle_lambda = d.getGlobals().lambda * 2 / 3;
+            double kyle_lambda = d.getGlobals().lambda * 2/3;
             double dv_endo = kyle_lambda * netDemand;
             System.out.println("Market signal: " + dv_endo);
 

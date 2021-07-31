@@ -245,9 +245,10 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   protected boolean isMarginCallTriggered() {
     double totalValueOfShorts = Math.abs(shares) * getMarketPrice();
     return ((marginAccount - totalValueOfShorts) / totalValueOfShorts) < maintenanceMargin;
-    // formula: if (Trader's money / value of all short position) x 100% < maintenance margin,
-    // then margin call is triggered
-
+    /*
+      formula: if (Trader's money / value of all short position) x 100% < maintenance margin,
+      then margin call is triggered
+    */
   }
 
   protected void shortSell(double volume) {
@@ -296,4 +297,5 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   protected boolean hasEnoughWealth(double totalValueOfShares) {
     return wealth >= totalValueOfShares;
   }
+
 }

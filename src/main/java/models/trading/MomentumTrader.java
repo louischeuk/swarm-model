@@ -20,7 +20,7 @@ public class MomentumTrader extends Trader {
 
   boolean isOpinionOn = false;
 
-  int countTick = 0;
+//  int countTick = 0;
 
   private static Action<MomentumTrader> action(SerializableConsumer<MomentumTrader> consumer) {
     return Action.create(MomentumTrader.class, consumer);
@@ -34,15 +34,15 @@ public class MomentumTrader extends Trader {
 
   private double getDemand() {
 
-    if (++countTick == getGlobals().tickToStartOpinionExchange) {
+    if (getGlobals().tickCount == getGlobals().tickToStartOpinionExchange) {
       isOpinionOn = true;
       System.out.println("opinion starts to exchange");
     }
 
     double demand;
-    if (isOpinionOn) { // isOpinion = true
+    if (isOpinionOn) {
       demand = Math.tanh(Math.abs(momentum + opinion) * getGlobals().mtParams_gamma);
-    } else { // isOpinion = false
+    } else {
       demand = Math.tanh(Math.abs(momentum) * getGlobals().mtParams_gamma);
     }
     getDoubleAccumulator("MtDemand").add(demand);
@@ -90,7 +90,7 @@ public class MomentumTrader extends Trader {
             System.out.println("Trader ID " + t.getID() + " received opinion");
 
             if (t.isOpinionOn) {
-              //            t.adjustOpinionWithInfluencerOpinion();
+//              t.adjustOpinionWithInfluencerOpinion();
               t.adjustOpinionWithTradersOpinions();
             }
             t.getDoubleAccumulator("opinions").add(t.opinion);
@@ -140,10 +140,8 @@ public class MomentumTrader extends Trader {
 
   /* take opinion from influencer */
   public void adjustOpinionWithInfluencerOpinion() {
-
     if (hasMessageOfType(InfluencerSocialNetworkOpinion.class)) {
       double influencerOpinion = getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
-
       System.out.println("WOWWWWWWWW Opinion from Elon Musk: " + influencerOpinion);
 
 //      if (opinion > 0) {

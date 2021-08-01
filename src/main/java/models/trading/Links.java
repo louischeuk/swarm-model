@@ -8,4 +8,6 @@ public class Links {
   public static class SocialNetworkLink extends Link.Empty {}
 
   public static class DataProviderLink extends Link.Empty{}
+
+  public static class HedgeFundLink extends Link.Empty{}
 }

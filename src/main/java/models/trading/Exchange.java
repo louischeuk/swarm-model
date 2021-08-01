@@ -22,8 +22,12 @@ public class Exchange extends Agent<TradingModel.Globals> {
 
   public static Action<Exchange> sendPriceToTraders =
       action(m -> {
+        System.out.println("Tick Count:" + ++ m.getGlobals().tickCount);
+
         System.out.println("---------------------------------------------------------------------");
         m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
+        m.getLinks(Links.HedgeFundLink.class).send(Messages.MarketPrice.class, m.price);
+
       });
 
   public static Action<Exchange> calcPriceImpact =
@@ -58,6 +62,10 @@ public class Exchange extends Agent<TradingModel.Globals> {
             System.out.println("Current market price: " + m.price);
             m.getDoubleAccumulator("price").add(m.price);
             m.getLinks(Links.DataProviderLink.class).send(Messages.NetDemand.class, netDemand);
+
+            /* ---------------- */
+            m.getLinks(Links.HedgeFundLink.class).send(Messages.MarketPrice.class, m.price);
+            /* ---------------- */
 
           });
 }

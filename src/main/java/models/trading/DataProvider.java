@@ -16,7 +16,7 @@ public class DataProvider extends Agent<Globals> {
   public double dv_exo;
 
   private double accumulatedNetDemand = 0;
-  private long tick = 0L;
+//  private long tick = 0L;
 
   /* --------- function definitions --------- */
   private static Action<DataProvider> action(SerializableConsumer<DataProvider> consumer) {
@@ -29,8 +29,8 @@ public class DataProvider extends Agent<Globals> {
           d -> {
             d.getDoubleAccumulator("equilibrium").add(d.trueValue);
 
-            ++d.tick;
-            System.out.println("Time step: " + d.tick + "\n");
+//            ++d.tick;
+//            System.out.println("Time step: " + d.tick + "\n");
             System.out.println("This is Bloomberg");
 
             double netDemand = d.getMessageOfType(Messages.NetDemand.class).getBody();

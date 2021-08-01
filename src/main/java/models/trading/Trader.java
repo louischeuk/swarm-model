@@ -24,6 +24,7 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
 
   Type type; /* Trader type */
 
+  @Variable
   public double wealth;
 
   @Variable

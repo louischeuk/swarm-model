@@ -50,9 +50,9 @@ public class FundamentalTrader extends Trader {
   public static Action<FundamentalTrader> adjustIntrinsicValue =
       action(
           t -> {
-            if (t.hasMessageOfType(Messages.MarketShock.class)) {
-              System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
-            }
+//            if (t.hasMessageOfType(Messages.MarketShock.class)) {
+//              System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
+//            }
 
             double trueValue = t.getMessageOfType(Messages.TrueValue.class).getBody();
             t.intrinsicValue = t.zScore * t.getGlobals().sigma_u + trueValue;

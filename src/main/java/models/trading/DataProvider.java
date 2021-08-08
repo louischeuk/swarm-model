@@ -52,9 +52,9 @@ public class DataProvider extends Agent<Globals> {
             System.out.println("Market signal: " + dv_endo);
 
            /*
-               new True value = prev true value + random walk (dv_exo) + market signal (dv_endo)
-               V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process + market signal
-                    = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i) + market signal
+               new True value = prev true value + random walk (dv_exo) + market impact (dv_endo)
+               V(t) = V(t – 1) + N(0,sd_v) + jump diffusion process + market impact
+                    = V(t – 1) + N(0,sd_v) + summation[i, N_t](Y_i) + market impact
             */
             d.trueValue = d.trueValue + d.dv_exo + dv_endo;
             d.trueValue = d.trueValue < 0 ? 0 : d.trueValue;

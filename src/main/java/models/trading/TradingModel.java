@@ -25,7 +25,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     public int tickCount = 0;
 
     @Input(name = "Wealth")
-    public double wealth = 1000;
+    public double wealth = 300;
 
     @Input(name = "Number of FT Traders")
     public int numFundamentalTrader = 5;
@@ -84,7 +84,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
 
     /* smaller the value, more clusters formed */
     @Input(name = "vicinity Range")
-    public double vicinityRange = 5; /*
+    public double vicinityRange = 6; /*
                                         2: converge to close to 0
                                         above 2: all converge to 3
                                      */
@@ -174,7 +174,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
       Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
           getGlobals().numFundamentalTrader, t -> {
             t.type = Type.Fundamental;
-            t.wealth = t.getPrng().exponential(getGlobals().wealth).sample();
+            t.wealth = t.getPrng().pareto(getGlobals().wealth, 3).sample();
             t.zScore = t.getPrng().normal(0, 1).sample();
             t.intrinsicValue = trueValue + t.zScore * getGlobals().sigma_u;
 
@@ -190,7 +190,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     if (getGlobals().numNoiseTrader > 0) {
       Group<NoiseTrader> noiseTraderGroup = generateGroup(NoiseTrader.class,
           getGlobals().numNoiseTrader, t -> {
-            t.wealth = t.getPrng().exponential(getGlobals().wealth).sample();
+            t.wealth = t.getPrng().pareto(getGlobals().wealth, 3).sample();
             t.type = Type.Noise;
             System.out.println("Trader type: " + t.type);
           });
@@ -202,7 +202,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     if (getGlobals().numMomentumTrader > 0) {
       Group<MomentumTrader> momentumTraderGroup = generateGroup(MomentumTrader.class,
           getGlobals().numMomentumTrader, t -> {
-            t.wealth = t.getPrng().exponential(getGlobals().wealth).sample();
+            t.wealth = t.getPrng().pareto(getGlobals().wealth,3).sample();
 
             t.opinion = t.getPrng().normal(0, 1).sample();
             t.type = Type.Momentum;
@@ -219,7 +219,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
     if (getGlobals().numCoordinatedTrader > 0) {
       Group<CoordinatedTrader> coordinatedTraderGroup = generateGroup(CoordinatedTrader.class,
           getGlobals().numCoordinatedTrader, t -> {
-            t.wealth = t.getPrng().exponential(getGlobals().wealth).sample();
+            t.wealth = t.getPrng().pareto(getGlobals().wealth, 3).sample();
             t.type = Type.Coordinated;
             t.opinion = getGlobals().ctOpinion;
             System.out.println("Trader type: " + t.type);
@@ -255,7 +255,7 @@ public class TradingModel extends AgentBasedModel<TradingModel.Globals> {
             Split.create(
                 MomentumTrader.updateMomentum,
                 Trader.submitOrders
-//                ,HedgeFund.submitOrders // ------- Hedge Fund
+                ,HedgeFund.submitOrders // ------- Hedge Fund
             ),
             Exchange.calcPriceImpact,
             Split.create(

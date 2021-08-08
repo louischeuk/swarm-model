@@ -105,7 +105,7 @@ public class MomentumTrader extends Trader {
     int count = 0;
     for (Double o : opinionsList) {
       if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
-        if (isSameSign(o) || (Math.abs(o - momentum) < (getGlobals().vicinityRange + 0.5))) {
+        if (isSameSign(o) || (Math.abs(o - momentum) < (getGlobals().vicinityRange * 0.5))) {
           opinion += (o - opinion) * getGlobals().gamma;
           count++;
         }
@@ -118,7 +118,7 @@ public class MomentumTrader extends Trader {
   // it doesnt work well because the opinions considered are still close to the self opinion,
   // so it converges super quickly
 //        double gamma = 1 / (Math.abs(o - opinion) + 1);
-//        double beta = 1 - gamma;
+//        double beta = 1 - gamma;)
 //        /* opinion = opinion * selfConfidence + otherOpinion * ConfidenceToOther */
 //        opinion = opinion * beta + o * gamma;
 

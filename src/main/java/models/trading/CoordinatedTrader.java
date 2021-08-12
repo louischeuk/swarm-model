@@ -1,6 +1,7 @@
 package models.trading;
 
 import models.trading.Links.SocialNetworkLink;
+import models.trading.Trader;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;

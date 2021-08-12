@@ -9,7 +9,7 @@ import simudyne.core.abm.Agent;
 import simudyne.core.functions.SerializableConsumer;
 import simudyne.core.graph.Message.Double;
 
-public class SocialNetwork extends Agent<TradingModel.Globals> {
+public class SocialNetwork extends Agent<Globals> {
 
   private static Action<SocialNetwork> action(SerializableConsumer<SocialNetwork> consumer) {
     return Action.create(SocialNetwork.class, consumer);

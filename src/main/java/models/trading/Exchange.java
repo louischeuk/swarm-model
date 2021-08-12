@@ -10,7 +10,7 @@ import simudyne.core.functions.SerializableConsumer;
 import simudyne.core.graph.Message.Double;
 
 /* market only knows the market prices, its demand and supply */
-public class Exchange extends Agent<TradingModel.Globals> {
+public class Exchange extends Agent<Globals> {
 
   @Variable
   public float price;

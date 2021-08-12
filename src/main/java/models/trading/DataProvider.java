@@ -1,6 +1,5 @@
 package models.trading;
 
-import models.trading.TradingModel.Globals;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;

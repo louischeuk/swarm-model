@@ -1,7 +1,6 @@
 package models.trading;
 
 import models.trading.Links.HedgeFundLink;
-import models.trading.TradingModel.Globals;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -19,6 +18,7 @@ import simudyne.core.functions.SerializableConsumer;
 
    4. HF is out of market
  */
+//TODO: Package was not being imported properly in line below - previously was 'Agent<Globals>'
 public class HedgeFund extends Agent<Globals> {
 
   public enum Side {BUY, SELL}

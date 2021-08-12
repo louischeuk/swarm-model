@@ -7,7 +7,7 @@ import simudyne.core.abm.Agent;
 import simudyne.core.functions.SerializableConsumer;
 
 /* eg. Elon Musk */
-public class Influencer extends Agent<TradingModel.Globals> {
+public class Influencer extends Agent<Globals> {
 
   double opinion; /* extremest. be high to have a nice uptrend curve of market price */
 

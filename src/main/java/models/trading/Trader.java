@@ -6,7 +6,7 @@ import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
-public abstract class Trader extends Agent<TradingModel.Globals> {
+public abstract class Trader extends Agent<Globals> {
 
   public enum Side {BUY, SELL}
 

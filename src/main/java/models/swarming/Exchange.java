@@ -1,8 +1,8 @@
-package models.trading;
+package models.swarming;
 
-import models.trading.Messages.CloseShortPosOrderPlaced;
-import models.trading.Messages.SellOrderPlaced;
-import models.trading.Messages.ShortSellOrderPlaced;
+import models.swarming.Messages.CloseShortPosOrderPlaced;
+import models.swarming.Messages.SellOrderPlaced;
+import models.swarming.Messages.ShortSellOrderPlaced;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -10,7 +10,7 @@ import simudyne.core.functions.SerializableConsumer;
 import simudyne.core.graph.Message.Double;
 
 /* market only knows the market prices, its demand and supply */
-public class Exchange extends Agent<TradingModel.Globals> {
+public class Exchange extends Agent<Globals> {
 
   @Variable
   public float price;
@@ -21,26 +21,33 @@ public class Exchange extends Agent<TradingModel.Globals> {
   }
 
   public static Action<Exchange> sendPriceToTraders =
-      action(m -> {
-        System.out.println("Tick Count:" + ++ m.getGlobals().tickCount);
-
+      action(e -> {
+        e.getGlobals().tickCount++;
+        System.out.println("Tick Count:" + e.getGlobals().tickCount);
         System.out.println("---------------------------------------------------------------------");
-        m.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, m.price);
-        m.getLinks(Links.HedgeFundLink.class).send(Messages.MarketPrice.class, m.price);
+        e.getLinks(Links.TradeLink.class).send(Messages.MarketPrice.class, e.price);
+        e.getLinks(Links.HedgeFundLink.class).send(Messages.MarketPrice.class, e.price);
 
       });
 
   public static Action<Exchange> calcPriceImpact =
       action(
-          m -> {
+          e -> {
 
-            double buys = m.getMessagesOfType(Messages.BuyOrderPlaced.class)
+            ///////////// testing ////////////
+            if (e.getGlobals().tickCount == 50) {
+              e.getGlobals().pMomentumTrade = 0.1;
+              e.getGlobals().pCoordinatedTrade = 0.1;
+            }
+            ////////////////
+
+            double buys = e.getMessagesOfType(Messages.BuyOrderPlaced.class)
                 .stream().mapToDouble(Double::getBody).sum();
-            double sells = m.getMessagesOfType(SellOrderPlaced.class)
+            double sells = e.getMessagesOfType(SellOrderPlaced.class)
                 .stream().mapToDouble(Double::getBody).sum();
-            double shorts = m.getMessagesOfType(ShortSellOrderPlaced.class)
+            double shorts = e.getMessagesOfType(ShortSellOrderPlaced.class)
                 .stream().mapToDouble(Double::getBody).sum();
-            double covers = m.getMessagesOfType(CloseShortPosOrderPlaced.class)
+            double covers = e.getMessagesOfType(CloseShortPosOrderPlaced.class)
                 .stream().mapToDouble(Double::getBody).sum();
 
             System.out.println(
@@ -52,19 +59,19 @@ public class Exchange extends Agent<TradingModel.Globals> {
             System.out.println("Net demand: " + netDemand);
 
             if (netDemand != 0) {
-              double lambda = m.getGlobals().lambda;
+              double lambda = e.getGlobals().lambda;
               float priceChange = (float) (netDemand * lambda);
               System.out.println("Price change: " + priceChange);
 
-              m.price = (m.price + priceChange) < 0 ? 0 : (m.price + priceChange);
+              e.price = (e.price + priceChange) < 0 ? 0 : (e.price + priceChange);
             }
 
-            System.out.println("Current market price: " + m.price);
-            m.getDoubleAccumulator("price").add(m.price);
-            m.getLinks(Links.DataProviderLink.class).send(Messages.NetDemand.class, netDemand);
+            System.out.println("Current market price: " + e.price);
+            e.getDoubleAccumulator("price").add(e.price);
+            e.getLinks(Links.DataProviderLink.class).send(Messages.NetDemand.class, netDemand);
 
             /* ---------------- */
-            m.getLinks(Links.HedgeFundLink.class).send(Messages.MarketPrice.class, m.price);
+            e.getLinks(Links.HedgeFundLink.class).send(Messages.MarketPrice.class, e.price);
             /* ---------------- */
 
           });

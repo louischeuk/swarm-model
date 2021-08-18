@@ -1,4 +1,4 @@
-package models.trading;
+package models.swarming;
 
 import java.util.HashMap;
 import java.util.List;
@@ -28,9 +28,10 @@ public class Messages {
 
   public static class TrueValue extends Message.Double {}
 
+  public static class DeltaTrueValue extends Message.Double {}
+
   public static class HistoricalPrices extends Message { // for EMA traders only
-    HashMap<java.lang.Long, java.lang.Double> historicalPrices;
-  }
+    HashMap<java.lang.Long, java.lang.Double> historicalPrices; }
 
   public static class NetDemand extends Message.Double {}
 

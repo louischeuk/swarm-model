@@ -1,12 +1,14 @@
-package models.trading;
+package models.swarming;
 
-import models.trading.Links.TradeLink;
+import models.swarming.Links.TradeLink;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 import simudyne.core.functions.SerializableConsumer;
 
-public abstract class Trader extends Agent<TradingModel.Globals> {
+public abstract class Trader extends Agent<Globals> {
+
+
 
   public enum Side {BUY, SELL}
 
@@ -17,9 +19,6 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
    Fundamental trader (informed): force to buy and sell at prices bounded by the intrinsic value
    Momentum: buy securities that are rising and sell them when they look to have peaked
    Coordinated: Reddit WSB - buy and strong hold
-   minimal-intelligence trader: adapt to the environment is seen by some as a minimal intelligence
-   opinionated: has the knowledge of Limit Order Book.
-                        submits quote prices that vary according to its opinion
    */
 
   Type type; /* Trader type */
@@ -68,6 +67,12 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
                   t.handleWhenSellShares(volume);
                   break;
               }
+
+              if (t.type == Type.Coordinated || t.type == Type.Momentum) {
+                t.getDoubleAccumulator("Wealth").add(t.wealth);
+                t.getDoubleAccumulator("marginAcct").add(t.marginAccount);
+              }
+
 
             } else {
               System.out.println("Trader " + t.getID() + " holds");
@@ -269,5 +274,4 @@ public abstract class Trader extends Agent<TradingModel.Globals> {
   protected boolean hasEnoughWealth(double totalValueOfShares) {
     return wealth >= totalValueOfShares;
   }
-
 }

@@ -1,4 +1,4 @@
-package models.trading;
+package models.swarming;
 
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
@@ -35,6 +35,8 @@ public class FundamentalTrader extends Trader {
     return (ftParam_kappa / numFundamentalTrader) * Math.abs(getPriceDistortion());
   }
 
+
+
   @Override
   protected Side getSide() {
     return priceDistortion > 0 ? Side.BUY : Side.SELL;
@@ -47,13 +49,9 @@ public class FundamentalTrader extends Trader {
   }
 
   /* random walk - brownian motion - keep estimate */
-  public static Action<FundamentalTrader> adjustIntrinsicValue =
+  public static Action<FundamentalTrader> updateIntrinsicValue =
       action(
           t -> {
-//            if (t.hasMessageOfType(Messages.MarketShock.class)) {
-//              System.out.println("Market shock is triggered!!!!!!!!!!!!!!");
-//            }
-
             double trueValue = t.getMessageOfType(Messages.TrueValue.class).getBody();
             t.intrinsicValue = t.zScore * t.getGlobals().sigma_u + trueValue;
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;

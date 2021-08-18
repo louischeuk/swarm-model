@@ -1,4 +1,4 @@
-package models.trading;
+package models.swarming;
 
 import simudyne.core.graph.Link;
 
@@ -10,4 +10,8 @@ public class Links {
   public static class DataProviderLink extends Link.Empty{}
 
   public static class HedgeFundLink extends Link.Empty{}
+
+  public static class InfluencerLink extends Link.Empty{}
+
+
 }

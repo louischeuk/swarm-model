@@ -1,4 +1,4 @@
-package models.trading;
+package models.swarming;
 
 /* Noise trader (uninformed): Randomly buy or sell. Only contribute to noise */
 public class NoiseTrader extends Trader {

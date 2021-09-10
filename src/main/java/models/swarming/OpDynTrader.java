@@ -1,6 +1,7 @@
 package models.swarming;
 
 import models.swarming.Links.SocialNetworkLink;
+import models.swarming.Messages.DvTrueValue;
 import models.swarming.Messages.InfluencerSocialNetworkOpinion;
 import simudyne.core.abm.Action;
 import simudyne.core.annotations.Variable;
@@ -26,6 +27,7 @@ public abstract class OpDynTrader extends Trader {
 
   /* ------- from OpDynTrader class ------------- */
 
+  /* update the self opinion */
   protected abstract void updateOpinion();
 
   protected abstract void adjustOpinionWithTradersOpinions();
@@ -35,7 +37,6 @@ public abstract class OpDynTrader extends Trader {
       action(
           t -> {
             t.getLinks(SocialNetworkLink.class).send(Messages.TraderOpinionShared.class, t.opinion);
-            System.out.println("Trader " + t.getID() + " sent opinion");
           });
 
   /* fetch the opinion from social network and update the self opinion accordingly */
@@ -46,70 +47,32 @@ public abstract class OpDynTrader extends Trader {
   protected void adjustOpWithInfluencerOp() {
     if (hasMessageOfType(InfluencerSocialNetworkOpinion.class)) {
       double influencerOpinion = getMessageOfType(InfluencerSocialNetworkOpinion.class).getBody();
-      System.out.println("Elon post a tweet !!!!!!!!!!!!!!!!! " + influencerOpinion);
-      opinion += influencerOpinion * getGlobals().influencer_k; // take influencer opinion
-
-      // update using fixed factor / confidence factor?
-
-      // double confidenceFactor = (1 / (Math.abs(influencerOpinion - opinion) + getGlobals().k));
-      // opinion += (influencerOpinion - opinion) * confidenceFactor;
+      opinion += influencerOpinion * getGlobals().weighting_influencer; // take influencer opinion
     }
   }
 
+  /* update sigma_ct (coordinated traders) or mtParams_beta (momentum traders) */
   protected double updateSigma(double prevOpinion, double sigma) {
 
     double prevOpinionCopy = Math.abs(prevOpinion);
     double opinionCopy = Math.abs(opinion);
 
+    double demandMultiplier =
+        type == Type.Momentum ? getGlobals().mt_demandMultiplier : getGlobals().ct_demandMultiplier;
+
     if (prevOpinionCopy < opinionCopy) {
-      sigma = (opinionCopy * sigma / prevOpinionCopy) * getGlobals().multiplier;
+      sigma = (opinionCopy * sigma / prevOpinionCopy) * demandMultiplier;
     } else {
-      sigma = (opinionCopy * sigma / prevOpinionCopy) / getGlobals().multiplier;
+      sigma = (opinionCopy * sigma / prevOpinionCopy) / demandMultiplier;
     }
     return sigma;
-
-//    if (prevOpinion < 0 && opinion < 0) {
-//      if (prevOpinion < opinion) {
-//        sigma = (opinion * sigma / prevOpinion) / getGlobals().multiplier;
-//      } else {
-//        sigma = (opinion * sigma / prevOpinion) * getGlobals().multiplier;
-//      }
-//    }
-//    else if (prevOpinion > 0 && opinion > 0) {
-//      if (prevOpinion < opinion) {
-//        sigma = (opinion * sigma / prevOpinion) * getGlobals().multiplier;
-//      } else {
-//        sigma = (opinion * sigma / prevOpinion) / getGlobals().multiplier;
-//      }
-//    }
-//    else if (prevOpinion < 0 && opinion > 0) {
-//      sigma = -1 * (opinion * sigma / prevOpinion) * getGlobals().multiplier;
-//    }
-//    else if (prevOpinion > 0 && opinion < 0) {
-//      sigma = -1 * (opinion * sigma / prevOpinion) / getGlobals().multiplier;
-//    }
-//    return sigma <= 0 ? 0 : sigma;
-
-//    if (prevOpinion > 0) {
-//      if (prevOpinion < opinion) {
-//        sigma = (opinion * sigma / prevOpinion) * getGlobals().multiplier;
-//      } else {
-//        sigma = (opinion * sigma / prevOpinion) / getGlobals().multiplier;
-//      }
-//      return sigma <= 0 ? 0 : sigma;
-//    } else {
-//      return getGlobals().sigma_ct;
-//    }
   }
 
+  /* consider change in market true value */
   protected void adjustOpWithDvTrueValue() {
-    System.out.println("Inside adjustWithDeltaTrueValue");
-    if (hasMessageOfType(Messages.DeltaTrueValue.class)) {
-
-      double dv_trueValue = getMessageOfType(Messages.DeltaTrueValue.class).getBody();
-
-      System.out.println(type + " trader received delta of true value: " + dv_trueValue);
-      double dv_opinion = getGlobals().weightingForDeltaOpinion * dv_trueValue;
+    if (hasMessageOfType(DvTrueValue.class)) {
+      double dv_trueValue = getMessageOfType(DvTrueValue.class).getBody();
+      double dv_opinion = getGlobals().weighting_dvTrueValue * dv_trueValue;
       opinion += dv_opinion;
     }
   }

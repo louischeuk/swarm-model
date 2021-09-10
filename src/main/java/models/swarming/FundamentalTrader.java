@@ -12,7 +12,6 @@ public class FundamentalTrader extends Trader {
 
   private double priceDistortion;
 
-  @Variable
   public double zScore;
 
   /* ------------------ functions definition -------------------------*/
@@ -24,7 +23,6 @@ public class FundamentalTrader extends Trader {
 
   @Override
   protected double getAlpha() {
-    System.out.println("-------------- fundamental trader strategy --------------");
     return 1;
   }
 
@@ -35,20 +33,16 @@ public class FundamentalTrader extends Trader {
     return (ftParam_kappa / numFundamentalTrader) * Math.abs(getPriceDistortion());
   }
 
-
-
   @Override
   protected Side getSide() {
     return priceDistortion > 0 ? Side.BUY : Side.SELL;
   }
 
   private double getPriceDistortion() {
-    System.out.println("Intrinsic: " + intrinsicValue);
     priceDistortion = intrinsicValue - getMarketPrice();
     return priceDistortion;
   }
 
-  /* random walk - brownian motion - keep estimate */
   public static Action<FundamentalTrader> updateIntrinsicValue =
       action(
           t -> {
@@ -57,9 +51,3 @@ public class FundamentalTrader extends Trader {
             t.intrinsicValue = t.intrinsicValue <= 0 ? 0 : t.intrinsicValue;
           });
 }
-
-
-// how to push the price of FT intrinsic
-// 1. FT takes opinions in account?
-// 2. sigma_u != 0
-

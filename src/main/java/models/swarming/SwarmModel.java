@@ -1,21 +1,20 @@
 package models.swarming;
 
+import models.swarming.Links.DataProviderLink;
+import models.swarming.Links.HedgeFundLink;
+import models.swarming.Links.SocialNetworkLink;
+import models.swarming.Links.TradeLink;
+import models.swarming.Trader.Side;
 import models.swarming.Trader.Type;
 import simudyne.core.abm.AgentBasedModel;
 import simudyne.core.abm.Group;
 import simudyne.core.abm.Sequence;
 import simudyne.core.abm.Split;
-import simudyne.core.annotations.Input;
 import simudyne.core.annotations.ModelSettings;
 
 @ModelSettings(macroStep = 200)
 public class SwarmModel extends AgentBasedModel<Globals> {
 
-  @Input(name = "Market price")
-  public float marketPrice = 30.0F;
-
-  @Input(name = "Market equilibrium")
-  public double trueValue = 30.0; /* called v_0 in paper */
 
   /* ------------------- model initialisation -------------------*/
   @Override
@@ -36,9 +35,9 @@ public class SwarmModel extends AgentBasedModel<Globals> {
         SocialNetwork.class, Influencer.class,
         FundamentalTrader.class, NoiseTrader.class,
         MomentumTrader.class, CoordinatedTrader.class,
-        HedgeFundShort.class
-        , HedgeFundLong.class
-        , HedgeFundShort2.class
+        HedgeFundShortLow.class,
+        HedgeFundShortHigh.class,
+        HedgeFundLong.class
     );
 
     registerLinkTypes(Links.TradeLink.class,
@@ -50,134 +49,221 @@ public class SwarmModel extends AgentBasedModel<Globals> {
   @Override
   public void setup() {
 
-    /* ---------------------- Groups creation ---------------------- */
+    /* ---------------------- agents ---------------------- */
     Group<SocialNetwork> socialMediaGroup = null;
-    if (getGlobals().numSocialMedia > 0) {
-      socialMediaGroup = generateGroup(SocialNetwork.class, getGlobals().numSocialMedia);
+    if (getGlobals().numSocialNetwork > 0) {
+      socialMediaGroup = generateGroup(SocialNetwork.class, getGlobals().numSocialNetwork);
     }
 
     Group<DataProvider> dataProviderGroup = null;
     if (getGlobals().numDataProvider > 0) {
       dataProviderGroup = generateGroup(DataProvider.class, getGlobals().numDataProvider,
-          d -> d.trueValue = trueValue);
-      dataProviderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
+          d -> d.trueValue = getGlobals().trueValue);
+      dataProviderGroup.fullyConnected(socialMediaGroup, SocialNetworkLink.class);
     }
 
     Group<Exchange> exchangeGroup = null;
     if (getGlobals().numExchange > 0) {
       exchangeGroup = generateGroup(Exchange.class, getGlobals().numExchange,
-          m -> m.price = marketPrice);
-      exchangeGroup.fullyConnected(dataProviderGroup, Links.DataProviderLink.class);
+          m -> m.price = getGlobals().marketPrice);
+      exchangeGroup.fullyConnected(dataProviderGroup, DataProviderLink.class);
     }
 
-    // expect 1 agent from SocialMedia, DataProvider, Exchange class
     assert exchangeGroup != null;
     assert dataProviderGroup != null;
     assert socialMediaGroup != null;
 
-    /* ---------------------- market participants ---------------------- */
+    /* ---------------------- Individual traders ---------------------- */
+
+    Trader.initialMarginRequirement = getGlobals().initialMarginRequirement;
+    Trader.maintenanceMargin = getGlobals().maintenanceMargin;
 
     if (getGlobals().numFundamentalTrader > 0) {
       Group<FundamentalTrader> fundamentalTraderGroup = generateGroup(FundamentalTrader.class,
           getGlobals().numFundamentalTrader, t -> {
             t.type = Type.Fundamental;
-            t.wealth = t.getPrng().pareto(getGlobals().wealth, 3).sample();
-            t.zScore = t.getPrng().normal(0, 1).sample();
-            t.intrinsicValue = trueValue + t.zScore * getGlobals().sigma_u;
+            t.isLeftMarket = false;
+            t.shares = 0;
+            t.marginAccount = 0;
+            t.wealth = t.getPrng().pareto(getGlobals().wealth_trader, getGlobals().pareto_params)
+                .sample();
 
-            System.out.println("Trader type: " + t.type);
+            /* --- fundamental traders specific ---- */
+            t.zScore = t.getPrng().normal(0, 1).sample();
+            t.intrinsicValue = getGlobals().trueValue + t.zScore * getGlobals().sigma_u;
           });
 
-      fundamentalTraderGroup.fullyConnected(exchangeGroup, Links.TradeLink.class);
-      exchangeGroup.fullyConnected(fundamentalTraderGroup, Links.TradeLink.class);
-      dataProviderGroup.fullyConnected(fundamentalTraderGroup, Links.DataProviderLink.class);
+      fundamentalTraderGroup.fullyConnected(exchangeGroup, TradeLink.class);
+      exchangeGroup.fullyConnected(fundamentalTraderGroup, TradeLink.class);
+      dataProviderGroup.fullyConnected(fundamentalTraderGroup, DataProviderLink.class);
     }
 
     if (getGlobals().numNoiseTrader > 0) {
       Group<NoiseTrader> noiseTraderGroup = generateGroup(NoiseTrader.class,
           getGlobals().numNoiseTrader, t -> {
-            t.wealth = t.getPrng().pareto(getGlobals().wealth, 3).sample();
             t.type = Type.Noise;
-            System.out.println("Trader type: " + t.type);
+            t.shares = 0;
+            t.marginAccount = 0;
+            t.isLeftMarket = false;
+            t.wealth = t.getPrng().pareto(getGlobals().wealth_trader, getGlobals().pareto_params)
+                .sample();
           });
 
-      noiseTraderGroup.fullyConnected(exchangeGroup, Links.TradeLink.class);
-      exchangeGroup.fullyConnected(noiseTraderGroup, Links.TradeLink.class);
+      noiseTraderGroup.fullyConnected(exchangeGroup, TradeLink.class);
+      exchangeGroup.fullyConnected(noiseTraderGroup, TradeLink.class);
     }
 
     if (getGlobals().numMomentumTrader > 0) {
       Group<MomentumTrader> momentumTraderGroup = generateGroup(MomentumTrader.class,
           getGlobals().numMomentumTrader, t -> {
-            t.wealth = t.getPrng().pareto(getGlobals().wealth, 3).sample();
+            /* ---- basic ------ */
+            t.isLeftMarket = false;
+            t.shares = 0;
+            t.marginAccount = 0;
 
-            t.mtParams_beta = getGlobals().mtParams_beta;
-
-            t.opinion = t.getPrng().normal(0, 1).sample();
+            /* --- momentum traders specific ---- */
             t.type = Type.Momentum;
-            System.out.println("Trader type: " + t.type);
+            t.wealth = t.getPrng().pareto(getGlobals().wealth_trader, getGlobals().pareto_params)
+                .sample();
+            t.opinion = t.getPrng().normal(0, 1).sample();
+            t.momentum = 0.0;
+            t.lastMarketPrice = 0.0F;
+            t.mtParams_beta = getGlobals().mtParams_beta * Math.abs(t.opinion);
           });
 
-      momentumTraderGroup.fullyConnected(exchangeGroup, Links.TradeLink.class);
-      exchangeGroup.fullyConnected(momentumTraderGroup, Links.TradeLink.class);
+      momentumTraderGroup.fullyConnected(exchangeGroup, TradeLink.class);
+      exchangeGroup.fullyConnected(momentumTraderGroup, TradeLink.class);
 
-      momentumTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
-      socialMediaGroup.fullyConnected(momentumTraderGroup, Links.SocialNetworkLink.class);
+      momentumTraderGroup.fullyConnected(socialMediaGroup, SocialNetworkLink.class);
+      socialMediaGroup.fullyConnected(momentumTraderGroup, SocialNetworkLink.class);
     }
 
     if (getGlobals().numCoordinatedTrader > 0) {
       Group<CoordinatedTrader> coordinatedTraderGroup = generateGroup(CoordinatedTrader.class,
           getGlobals().numCoordinatedTrader, t -> {
-            t.wealth = t.getPrng().pareto(getGlobals().wealth, getGlobals().pareto_params).sample();
-            t.sigma_ct = getGlobals().sigma_ct;
-
             t.type = Type.Coordinated;
+            t.shares = 0;
+            t.marginAccount = 0;
+            t.isLeftMarket = false;
+            t.wealth = t.getPrng().pareto(getGlobals().wealth_trader, getGlobals().pareto_params)
+                .sample();
+
+            /* --- coordinated traders specific ---- */
             t.opinion = getGlobals().ctOpinion;
-            System.out.println("Trader type: " + t.type);
+            t.sigma_ct = getGlobals().sigma_ct;
           });
 
-      coordinatedTraderGroup.fullyConnected(exchangeGroup, Links.TradeLink.class);
-      exchangeGroup.fullyConnected(coordinatedTraderGroup, Links.TradeLink.class);
+      coordinatedTraderGroup.fullyConnected(exchangeGroup, TradeLink.class);
+      exchangeGroup.fullyConnected(coordinatedTraderGroup, TradeLink.class);
 
-      coordinatedTraderGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
-      socialMediaGroup.fullyConnected(coordinatedTraderGroup, Links.SocialNetworkLink.class);
+      coordinatedTraderGroup.fullyConnected(socialMediaGroup, SocialNetworkLink.class);
+      socialMediaGroup.fullyConnected(coordinatedTraderGroup, SocialNetworkLink.class);
     }
 
-//    if (getGlobals().numInfluencer > 0) {
-//      Group<Influencer> influencerGroup = generateGroup(Influencer.class,
-//          getGlobals().numInfluencer,
-//          i -> {
-//            i.opinion = getGlobals().influencerOpinion;
-//            System.out.println("Influencer created");
-//          });
-//
-//      influencerGroup.fullyConnected(socialMediaGroup, Links.SocialNetworkLink.class);
-//      socialMediaGroup.fullyConnected(influencerGroup, Links.SocialNetworkLink.class);
-//    }
+    /* ---------------- Influencer(s) ----------------- */
+    if (getGlobals().numInfluencer > 0) {
+      Group<Influencer> influencerGroup = generateGroup(Influencer.class,
+          getGlobals().numInfluencer,
+          i -> {
+            i.isTweeted = false;
+            i.opinion = getGlobals().influencerOpinion;
+            i.hypedPoint = getGlobals().influencerHypePoint;
+          });
 
-
-    /* ------------------------- */
-    if (getGlobals().numHedgeFund > 0) {
-      Group<HedgeFundShort> hedgeFundShortGroup = generateGroup(HedgeFundShort.class,
-          getGlobals().numHedgeFund);
-      hedgeFundShortGroup.fullyConnected(exchangeGroup, Links.HedgeFundLink.class);
-      exchangeGroup.fullyConnected(hedgeFundShortGroup, Links.HedgeFundLink.class);
-
-      dataProviderGroup.fullyConnected(hedgeFundShortGroup, Links.DataProviderLink.class);
-      System.out.println("Hedge fund short");
+      influencerGroup.fullyConnected(socialMediaGroup, SocialNetworkLink.class);
+      socialMediaGroup.fullyConnected(influencerGroup, SocialNetworkLink.class);
     }
-    /* ------------------------- */
 
-//    Group<HedgeFundLong> hedgeFund2Group = generateGroup(HedgeFundLong.class,1);
-//    hedgeFund2Group.fullyConnected(exchangeGroup, Links.HedgeFundLink.class);
-//    exchangeGroup.fullyConnected(hedgeFund2Group, Links.HedgeFundLink.class);
-//    dataProviderGroup.fullyConnected(hedgeFund2Group, Links.DataProviderLink.class);
+    /* ---------------- Hedge Fund(s) ----------------- */
+    if (getGlobals().numHedgeFundShortLow > 0) {
+      Group<HedgeFundShortLow> hedgeFundShortLowGroup = generateGroup(HedgeFundShortLow.class,
+          getGlobals().numHedgeFundShortLow, h -> {
+            /* ---- basics ----*/
+            h.type = Type.HedgeFundSL;
+            h.shares = 0;
+            h.marginAccount = 0;
+            h.isLeftMarket = false;
 
-    Group<HedgeFundShort2> hedgeFundShort2Group = generateGroup(HedgeFundShort2.class, 1);
-    hedgeFundShort2Group.fullyConnected(exchangeGroup, Links.HedgeFundLink.class);
-    exchangeGroup.fullyConnected(hedgeFundShort2Group, Links.HedgeFundLink.class);
+            /* ----- HF short low ---- */
+            h.isFirstSSInitiated = false;
+            h.isSecondSSInitiated = false;
+            h.isSSing = false;
 
-    dataProviderGroup.fullyConnected(hedgeFundShort2Group, Links.DataProviderLink.class);
-    System.out.println("Hedge fund short 2");
+            h.side = Side.SELL;
+            h.wealth = getGlobals().wealth_hf;
+            h.tickStartSS = 0; // will update when HF starts to short sell
+            h.priceToFirstSS = getGlobals().priceToFirstSS_hfShortLow;
+            h.tradeVolume = getGlobals().initialTradeVolume_hfShortLow; // change dynamically
+            h.ssDuration = getGlobals().ssDuration_hfShortLow;
+            h.priceToSecondSS = getGlobals().priceToSecondSS_hfShortLow;
+            h.priceToCoverPos = getGlobals().priceToClosePos_hfShortLow;
+            h.priceToStopLoss = getGlobals().priceToStopLoss_hfShortLow;
+          });
+
+      hedgeFundShortLowGroup.fullyConnected(exchangeGroup, HedgeFundLink.class);
+      exchangeGroup.fullyConnected(hedgeFundShortLowGroup, HedgeFundLink.class);
+
+      hedgeFundShortLowGroup.fullyConnected(exchangeGroup, TradeLink.class);
+      exchangeGroup.fullyConnected(hedgeFundShortLowGroup, TradeLink.class);
+
+      socialMediaGroup
+          .fullyConnected(hedgeFundShortLowGroup, SocialNetworkLink.class);
+    }
+
+    if (getGlobals().numHedgeFundShortHigh > 0) {
+      Group<HedgeFundShortHigh> hedgeFundShortHighGroup = generateGroup(HedgeFundShortHigh.class,
+          getGlobals().numHedgeFundShortHigh, h -> {
+            /* ---- basic ---- */
+            h.shares = 0;
+            h.marginAccount = 0;
+            h.isLeftMarket = false;
+            h.type = Type.HedgeFundSH;
+            h.wealth = getGlobals().wealth_hf;
+
+            /* ----- HF short high ---- */
+            h.isSSing = false;
+            h.isSSInitiated = false;
+            h.tradeVolume = getGlobals().initialTradeVolume_hfShortLow; // change dynamically
+            h.ssDuration = getGlobals().ssDuration_hfShortHigh;
+            h.priceToSS = getGlobals().priceToSS_hfShortHigh;
+            h.priceToClosePos = getGlobals().priceToClosePos_hfShortHigh;
+            h.priceToStopLoss = getGlobals().priceToStopLoss_hfShortHigh;
+          });
+
+      hedgeFundShortHighGroup.fullyConnected(exchangeGroup, HedgeFundLink.class);
+      exchangeGroup.fullyConnected(hedgeFundShortHighGroup, HedgeFundLink.class);
+
+      hedgeFundShortHighGroup.fullyConnected(exchangeGroup, TradeLink.class);
+      exchangeGroup.fullyConnected(hedgeFundShortHighGroup, TradeLink.class);
+
+      socialMediaGroup
+          .fullyConnected(hedgeFundShortHighGroup, SocialNetworkLink.class);
+
+    }
+
+    if (getGlobals().numHedgeFundLong > 0) {
+      Group<HedgeFundLong> hedgeFundLongGroup = generateGroup(HedgeFundLong.class,
+          getGlobals().numHedgeFundLong, h -> {
+            /* --- basic ----*/
+            h.isLeftMarket = false;
+            h.shares = 0;
+            h.marginAccount = 0;
+            h.type = Type.HedgeFundL;
+
+            /* --- HF Long ----*/
+            h.priceToBuy = getGlobals().priceToBuy_hfLong;
+            h.priceToSell = getGlobals().priceToSell_hfLong;
+            h.wealth = getGlobals().wealth_hf;
+          });
+
+      hedgeFundLongGroup.fullyConnected(exchangeGroup, HedgeFundLink.class);
+      exchangeGroup.fullyConnected(hedgeFundLongGroup, HedgeFundLink.class);
+
+      hedgeFundLongGroup.fullyConnected(exchangeGroup, TradeLink.class);
+      exchangeGroup.fullyConnected(hedgeFundLongGroup, TradeLink.class);
+
+      socialMediaGroup.fullyConnected(hedgeFundLongGroup, SocialNetworkLink.class);
+    }
 
     super.setup();
   }
@@ -190,50 +276,32 @@ public class SwarmModel extends AgentBasedModel<Globals> {
         Sequence.create(
             Exchange.sendPriceToTraders,
             Split.create(
-                Trader.submitOrders,
+                Trader.submitOrders, // individual traders + hedge funds
                 MomentumTrader.updateMomentum
-                , HedgeFundShort.submitOrders // ------- Hedge Fund short
-                , HedgeFundLong.submitOrders // ------- Hedge Fund long
-                , HedgeFundShort2.submitOrders // -------- Hedge Fund short 2
             ),
             Exchange.calcPriceImpact,
             DataProvider.updateTrueValue
         );
 
-    Split subSequenceShareOpinions =
-        Split.create(
-            Influencer.shareOpinion, // ------- Influencer
-            OpDynTrader.shareOpinion // only Momentum and Coordinated
-        );
-
-    Split subSequenceUpdateOpinion =
-        Split.create(
-            OpDynTrader.updateOpinion // Coordinate: (opinion increase with true value rising?
-            , Influencer.updateOpinion  // influencer update opinion by true value? (slow ball effort)
-
-        );  // wealth affect opinion?
-
-    /* ------------------------------------------------- */
+    /* -------------- Actual Run() --------------- */
     run(
         Sequence.create(
             Split.create(
-                subSequenceShareOpinions,
+                Influencer.shareOpinion,
+                OpDynTrader.shareOpinion,
                 subSequencePrice
             ),
             Split.create(
                 FundamentalTrader.updateIntrinsicValue,
                 Sequence.create(
-
+                    SocialNetwork.publishOpAndDvTrueValue,
                     Split.create(
-                        HedgeFundShort.updateStrategy, // ------ Hedge Fund short
-                        HedgeFundLong.updateStrategy, // ------- Hedge Fund long
-                        HedgeFundShort2.updateStrategy,
-                        SocialNetwork.publishOpinionsAndDeltaTrueValue
-                    ),
-                    subSequenceUpdateOpinion
+                        OpDynTrader.updateOpinion,
+                        Influencer.updateOpinion,
+                        HedgeFund.updateVolume
+                    )
                 )
             )
-
         )
     );
 

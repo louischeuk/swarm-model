@@ -8,17 +8,19 @@ import simudyne.core.functions.SerializableConsumer;
 
 public abstract class Trader extends Agent<Globals> {
 
-
-
   public enum Side {BUY, SELL}
 
-  public enum Type {Noise, Fundamental, Momentum, Coordinated}
+  public enum Type {Noise, Fundamental, Momentum, Coordinated,
+    HedgeFundSL, HedgeFundSH, HedgeFundL}
    /*
    ------- Trader type -------
-   Noise trader (uninformed): will randomly buy or sell
+   Noise trader (uninformed): randomly buy or sell
    Fundamental trader (informed): force to buy and sell at prices bounded by the intrinsic value
    Momentum: buy securities that are rising and sell them when they look to have peaked
    Coordinated: Reddit WSB - buy and strong hold
+   HedgeFundSL: hedge fund - going short the shares at a low price
+   HedgeFundSH: hedge fund - going short the shares at a high price
+   HedgeFundL: hedge fund - going long
    */
 
   Type type; /* Trader type */
@@ -27,16 +29,16 @@ public abstract class Trader extends Agent<Globals> {
   public double wealth;
 
   @Variable
-  public double shares = 0;
+  public double shares;
 
   @Variable
-  public double marginAccount = 0;
+  public double marginAccount;
 
-  boolean isBroke = false;
+  boolean isLeftMarket;
 
-  static double initialMarginRequirement = 0.5;
+  static double initialMarginRequirement;
 
-  static double maintenanceMargin = 0.3;
+  static double maintenanceMargin;
 
   /* ------------------- functions ------------------- */
 
@@ -48,12 +50,10 @@ public abstract class Trader extends Agent<Globals> {
       action(
           t -> {
 
-            if (t.isBroke) {
-              System.out.println("this trader is broke!");
+            if (t.isLeftMarket) {
               return;
             }
 
-            System.out.println("Trader id: " + t.getID());
             double alpha = t.getAlpha();
             double p = t.getPrng().uniform(0, 1).sample();
             if (p < alpha) {
@@ -73,16 +73,16 @@ public abstract class Trader extends Agent<Globals> {
                 t.getDoubleAccumulator("marginAcct").add(t.marginAccount);
               }
 
-
             } else {
-              System.out.println("Trader " + t.getID() + " holds");
-              t.hold(); // only uncomment if there are only FT Traders
+              t.hold();
             }
           }
       );
 
+  /* get the probability of trading */
   protected abstract double getAlpha();
 
+  /* either buy / cover or sell / short sell */
   protected abstract Side getSide();
 
   protected abstract double getVolume();
@@ -110,7 +110,6 @@ public abstract class Trader extends Agent<Globals> {
       return;
     }
 
-    System.out.println("Not enough money");
     noMoneyToTrade();
   }
 
@@ -125,8 +124,7 @@ public abstract class Trader extends Agent<Globals> {
     }
 
     if (wealth < 0 && shares <= 0) {
-      System.out.println("wealth drops below -ve: you broke!");
-      isBroke = true;
+      isLeftMarket = true;
     }
   }
 
@@ -163,10 +161,12 @@ public abstract class Trader extends Agent<Globals> {
     marginAccount = sharesToShort * getMarketPrice() * (1 + initialMarginRequirement);
   }
 
+  /* check if short selling is possible */
   protected boolean isShortSellAllowed(double sharesToSell) {
     return isWealthMeetInitialMarginRequirement(sharesToSell);
   }
 
+  /* check if a margin account can be initiated */
   protected boolean isWealthMeetInitialMarginRequirement(double sharesToSell) {
     // example: with 10K investment, you need 5K cash at start
     if (shares == 0) {
@@ -174,7 +174,6 @@ public abstract class Trader extends Agent<Globals> {
     }
 
     // share < 0: (there are already some short positions)
-    System.out.println("Hello short shares here is " + shares);
     return wealth >=
         ((Math.abs(shares) + sharesToSell) * getMarketPrice() * initialMarginRequirement);
 
@@ -182,19 +181,18 @@ public abstract class Trader extends Agent<Globals> {
 
   protected void handleDuringShortSelling() {
     if (isMarginCallTriggered() && !hasEnoughWealthToMaintainMarginAccount()) {
-      forceCloseShortPos();
-      System.out.println("shares (should be 0 at the point): " + shares);
-      System.out.println("Oh shit being forced to liquidate!");
+      forceCoverShortPos();
     }
   }
 
+  /* reset the margin account */
   protected void resetMarginAccount() { marginAccount = 0; }
 
-  protected void forceCloseShortPos() { closeShortPos(Math.abs(shares)); }
+  /* obligated to cover the short positions */
+  protected void forceCoverShortPos() { closeShortPos(Math.abs(shares)); }
 
+  /* cover the short positions */
   protected void closeShortPos(double volume) {
-
-    System.out.println("Close pos: " + volume);
     getDoubleAccumulator("closeShorts").add(volume);
     getLinks(TradeLink.class).send(Messages.CloseShortPosOrderPlaced.class, volume);
 
@@ -202,22 +200,16 @@ public abstract class Trader extends Agent<Globals> {
 
     if (shares >= 0) {
       resetMarginAccount();
-      System.out.println("Shorts Position got closed....");
     }
   }
 
+  /* buy the shares */
   protected void buy(double volume) {
-    if (volume != 0) {
-      System.out.println("buy volume: " + volume);
-    }
     getDoubleAccumulator("buys").add(volume);
     getLinks(TradeLink.class).send(Messages.BuyOrderPlaced.class, volume);
 
-//    System.out.println("Previous wealth: " + wealth);
     wealth -= getMarketPrice() * volume;
     shares += volume;
-//    System.out.println("Current wealth: " + wealth);
-//    System.out.println("Current shares: " + shares);
   }
 
   protected boolean hasEnoughWealthToMaintainMarginAccount() {
@@ -225,16 +217,17 @@ public abstract class Trader extends Agent<Globals> {
     return wealth >= totalValueOfShorts * maintenanceMargin;
   }
 
+  /* check if margin call is triggered */
   protected boolean isMarginCallTriggered() {
     double totalValueOfShorts = Math.abs(shares) * getMarketPrice();
     return ((marginAccount - totalValueOfShorts) / totalValueOfShorts) < maintenanceMargin;
     /*
       formula: if (Trader's money / value of all short position) x 100% < maintenance margin,
       then margin call is triggered
-      https://www.youtube.com/watch?v=4GA6WbQvn3I&ab_channel=MarketsKnow-How
     */
   }
 
+  /* short the shares */
   protected void shortSell(double volume) {
     if (shares < 0) {
       updateMarginAccount(Math.abs(shares) + volume);
@@ -245,32 +238,29 @@ public abstract class Trader extends Agent<Globals> {
     getDoubleAccumulator("shorts").add(volume);
     getLinks(TradeLink.class).send(Messages.ShortSellOrderPlaced.class, volume);
 
-    System.out.println("shares of short: " + volume);
-
     sell(volume);
   }
 
+  /* update the margin account */
   protected void updateMarginAccount(double volume) {
     marginAccount = volume * getMarketPrice() * (1 + initialMarginRequirement);
-    System.out.println("~~~~~~Margin account updated: " + marginAccount);
   }
 
+  /* sell the shares */
   protected void sell(double volume) {
-    System.out.println("sell volume: " + volume);
     getDoubleAccumulator("sells").add(volume);
     getLinks(TradeLink.class).send(Messages.SellOrderPlaced.class, volume);
 
-//    System.out.println("Previous wealth: " + wealth);
     wealth += getMarketPrice() * volume;
     shares -= volume;
-//    System.out.println("Current wealth: " + wealth);
-//    System.out.println("Current shares: " + shares);
   }
 
+  /* check if there are enough shares held */
   protected boolean hasEnoughShares(double volume) {
     return shares >= volume;
   }
 
+  /* check if there are enough wealth owned*/
   protected boolean hasEnoughWealth(double totalValueOfShares) {
     return wealth >= totalValueOfShares;
   }

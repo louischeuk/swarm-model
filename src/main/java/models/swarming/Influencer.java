@@ -2,6 +2,7 @@ package models.swarming;
 
 import java.util.List;
 import models.swarming.Links.SocialNetworkLink;
+import models.swarming.Messages.DvTrueValue;
 import models.swarming.Messages.InfluencerOpinionShared;
 import models.swarming.Messages.SocialNetworkOpinion;
 import simudyne.core.abm.Action;
@@ -13,12 +14,15 @@ import simudyne.core.functions.SerializableConsumer;
 public class Influencer extends Agent<Globals> {
 
   @Variable
-  public double opinion; /* extremest. be high to have a nice uptrend curve of market price */
+  public double hypedPoint;
 
-  public boolean isHyped = false;
+  @Variable
+  public double opinion; /* expect to be highly positive */
 
-  public double hypedPoint = 10;
-  private boolean isTweeted = false;
+  @Variable
+  public boolean isTweeted;
+
+  boolean isOpDynOn = false;
 
   private static Action<Influencer> action(SerializableConsumer<Influencer> consumer) {
     return Action.create(Influencer.class, consumer);
@@ -27,43 +31,43 @@ public class Influencer extends Agent<Globals> {
   public static Action<Influencer> shareOpinion =
       action(
           i -> {
-            if (i.isHyped && !i.isTweeted) {
+            i.checkIfOpDynIsOn();
+            if (i.opinion >= i.hypedPoint && !i.isTweeted) {
               i.getLinks(SocialNetworkLink.class).send(InfluencerOpinionShared.class, i.opinion);
-              System.out.println("Elon Musk (ID: " + i.getID() + ") sent opinion");
               i.isTweeted = true;
             }
           });
 
-  public static Action<Influencer> updateOpinion =
-      action(
-          i -> {
-            i.adjustOpWithDvTrueValue();
-            i.adjustOpWithTradersOps();
-            i.checkIfHyped();
-          });
 
-  private void checkIfHyped() {
-    if (opinion >= hypedPoint && !isTweeted) {
-      isHyped = true;
+  private void checkIfOpDynIsOn() {
+    if (getGlobals().tickCount == getGlobals().tickToStartOpDyn) {
+      isOpDynOn = true;
     }
   }
 
-  private void adjustOpWithTradersOps() {
+  public static Action<Influencer> updateOpinion =
+      action(
+          i -> {
+            if (i.isOpDynOn) {
+              i.adjustOpWithDvTrueValue();
+              i.adjustOpWithTradersOp();
+            }
+          });
+
+  private void adjustOpWithTradersOp() {
     if (hasMessageOfType(Messages.SocialNetworkOpinion.class)) {
       List<Double> opinionsList =
           getMessageOfType(SocialNetworkOpinion.class).opinionList;
-      System.out.println("Elon get " + opinionsList.size() + " opinions");
       double avgOpList = opinionsList.stream().mapToDouble(o -> o).average().orElse(0.0);
-      opinion += getGlobals().multiplier_i * (avgOpList - opinion);
+      opinion += getGlobals().multiplier_influencer * (avgOpList - opinion);
     }
   }
 
   private void adjustOpWithDvTrueValue() {
     if (getGlobals().tickCount >= getGlobals().tickToStartOpDyn) {
-      if (hasMessageOfType(Messages.DeltaTrueValue.class)) {
-        System.out.println("Elon get the deltaTrueValue");
-        double dv_trueValue = getMessageOfType(Messages.DeltaTrueValue.class).getBody();
-        opinion += getGlobals().multiplier_i * dv_trueValue;
+      if (hasMessageOfType(DvTrueValue.class)) {
+        double dv_trueValue = getMessageOfType(DvTrueValue.class).getBody();
+        opinion += getGlobals().multiplier_influencer * dv_trueValue;
       }
     }
   }

@@ -1,5 +1,6 @@
 package models.swarming;
 
+import models.swarming.Messages.DvTrueValue;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -14,8 +15,6 @@ public class DataProvider extends Agent<Globals> {
   @Variable
   public double dv_exo;
 
-  private double accumulatedNetDemand = 0;
-
   /* --------- function definitions --------- */
   private static Action<DataProvider> action(SerializableConsumer<DataProvider> consumer) {
     return Action.create(DataProvider.class, consumer);
@@ -27,10 +26,7 @@ public class DataProvider extends Agent<Globals> {
           d -> {
             d.getDoubleAccumulator("equilibrium").add(d.trueValue);
 
-            System.out.println("This is Bloomberg");
-
             double netDemand = d.getMessageOfType(Messages.NetDemand.class).getBody();
-            d.accumulatedNetDemand += netDemand;
 
             /* sum of jump size = Y_i * N_t = N(0,s_j) * P(lambda)   Note. s_j maybe == s_v. */
             double sigma_jd = d.getGlobals().sigma_jd;
@@ -41,11 +37,9 @@ public class DataProvider extends Agent<Globals> {
             // how the random walk changes
             double sigma_v = d.getGlobals().sigma_v;
             d.dv_exo = d.getPrng().normal(0, 1).sample() * sigma_v + jumpDiffusionProcess;
-            System.out.println("dv_exo: "+ d.dv_exo);
 
             double kyle_lambda = d.getGlobals().lambda * 2/3;
             double dv_endo = kyle_lambda * netDemand;
-            System.out.println("Market signal: " + dv_endo);
 
            /*
                new True value = prev true value + random walk (dv_exo) + market impact (dv_endo)
@@ -56,14 +50,8 @@ public class DataProvider extends Agent<Globals> {
             d.trueValue = d.trueValue + d.dv_exo + dv_endo;
             d.trueValue = d.trueValue < 0 ? 0 : d.trueValue;
 
-//            if (d.tick == 60 ) {
-//              // market re-adjustment
-//              d.trueValue = 10;
-//            }
-
-            System.out.println("New True value: " + d.trueValue);
             d.getLinks(Links.DataProviderLink.class).send(Messages.TrueValue.class, d.trueValue);
-            d.getLinks(Links.SocialNetworkLink.class).send(Messages.DeltaTrueValue.class, dv_trueValue);
+            d.getLinks(Links.SocialNetworkLink.class).send(DvTrueValue.class, dv_trueValue);
 
           });
 }

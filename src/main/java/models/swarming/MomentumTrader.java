@@ -9,9 +9,9 @@ import simudyne.core.functions.SerializableConsumer;
 public class MomentumTrader extends OpDynTrader {
 
   @Variable
-  public double momentum = 0.0; // 0.075 for testing
+  public double momentum;
 
-  float lastMarketPrice = 0.0F; //  5.0f for testing
+  float lastMarketPrice;
 
   @Variable
   public double mtParams_beta;
@@ -22,7 +22,6 @@ public class MomentumTrader extends OpDynTrader {
 
   @Override
   protected double getAlpha() {
-    System.out.println("********* momentum trader strategy *********");
     return getGlobals().pMomentumTrade;
   }
 
@@ -30,7 +29,6 @@ public class MomentumTrader extends OpDynTrader {
 
     if (getGlobals().tickCount == getGlobals().tickToStartOpDyn) {
       isOpDynOn = true;
-      System.out.println("opinion starts to exchange");
     }
 
     double demand;
@@ -45,12 +43,11 @@ public class MomentumTrader extends OpDynTrader {
 
   @Override
   protected double getVolume() {
-    return (mtParams_beta / getGlobals().numMomentumTrader) * getDemand(); // changed
+    return (mtParams_beta / getGlobals().numMomentumTrader) * getDemand();
   }
 
   @Override
   protected Side getSide() {
-    System.out.println("momentum: " + momentum);
     return (momentum + opinion) > 0 ? Side.BUY : Side.SELL;
   }
 
@@ -64,74 +61,32 @@ public class MomentumTrader extends OpDynTrader {
                   + (1.0 - mtParams_alpha) * t.momentum;
             }
             t.lastMarketPrice = price;
-            System.out.println("momentum updated");
           }
       );
 
   @Override
   protected void updateOpinion() {
-    System.out.println("Trader ID " + getID() + " received opinion");
 
     if (isOpDynOn) {
       double prevOpinion = opinion;
       adjustOpWithInfluencerOp();
       adjustOpinionWithTradersOpinions();
-//      adjustOpinionWithDvTrueValue();
-
       mtParams_beta = updateSigma(prevOpinion, mtParams_beta);
     }
     getDoubleAccumulator("opinions").add(opinion);
 
   }
 
-  /* take opinion from other trader agents */
+  /* consider opinions from other trader agents */
   public void adjustOpinionWithTradersOpinions() {
     List<Double> opinionsList = getMessageOfType(SocialNetworkOpinion.class).opinionList;
-
-    int count = 0;
     for (Double o : opinionsList) {
       if (Math.abs(o - opinion) < getGlobals().vicinityRange) {
-//        opinion += (o - opinion) * getGlobals().gamma;
-
-        double confidenceFactor = 1 / ((Math.abs(o - opinion) + getGlobals().cf_weighting));
+        double confidenceFactor = 1 / ((Math.abs(o - opinion) + getGlobals().weighting_cf));
         opinion += (o - opinion) * confidenceFactor;
-
-        count++;
       }
     }
-    System.out.println(count + " opinions out of " + opinionsList.size() + " opinions considered");
   }
-
-  /* dynamics confidence factor */
-  // it doesnt work well because the opinions considered are still close to the self opinion,
-  // so it converges super quickly
-//        double gamma = 1 / (Math.abs(o - opinion) + 1);
-//        double beta = 1 - gamma;)
-//        /* opinion = opinion * selfConfidence + otherOpinion * ConfidenceToOther */
-//        opinion = opinion * beta + o * gamma;
-
-
-
-//  private boolean isSameSign(Double o) {
-//    return (o > 0 && momentum > 0) || (o < 0 && momentum < 0);
-//  }
-
-
-
-  /*
-    take account of momentum ****!!!!!!!!!!!!!!!
-    opinion + and market goes up --> belief
-    opinion + but market goes own --> tend not to belief
-
-    eg.
-    a) momentum: 5, other opinion: 2 --> must belief
-    b) momentum: 1, other opinion: 2 --> still belief
-    c) momentum: -1, other opinion: 2 --> not belief
-  */
-
-
-
-
 }
 
 

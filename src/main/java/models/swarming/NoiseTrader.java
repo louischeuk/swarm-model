@@ -5,7 +5,6 @@ public class NoiseTrader extends Trader {
 
   @Override
   protected double getAlpha() {
-    System.out.println("^^^^^^^^^ noise trader strategy ^^^^^^^^^");
     return getGlobals().pNoiseTrade;
   }
 

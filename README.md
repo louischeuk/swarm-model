@@ -1,3 +1,3 @@
-# Simudyne Trading Tutorial
+# Swarm Model
 
-Documentation for this tutorial can be found online at https://portal.simudyne.com
+This model is to simulate the swarm-like behvaiour driven by opinion dynamics in financial market. 

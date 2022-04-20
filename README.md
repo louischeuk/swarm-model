@@ -1,3 +1,3 @@
-# Swarm Model
+# Agent-Based Modelling and Simulation of the Swarm-like Behaviour Driven by Opinion Dynamics in Financial Market
 
-This model is to simulate the swarm-like behvaiour driven by opinion dynamics in financial market. 
+Model created for my MSc dissertation.
